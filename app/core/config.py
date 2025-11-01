@@ -1,7 +1,8 @@
+import json
 from functools import lru_cache
 from typing import List, Optional
 
-from pydantic import AnyUrl, Field, field_validator
+from pydantic import AnyUrl, Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,16 +24,37 @@ class Settings(BaseSettings):
 
     docling_model_name: Optional[str] = None
 
-    allowed_origins: List[str] = Field(default_factory=lambda: ["*"])
+    allowed_origins_raw: Optional[str | List[str]] = Field(
+        default=None,
+        validation_alias="ALLOWED_ORIGINS",
+    )
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", env_prefix="APP_", extra="ignore")
 
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def _split_origins(cls, value: List[str] | str) -> List[str]:
-        if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
+    @computed_field(return_type=List[str])
+    @property
+    def allowed_origins(self) -> List[str]:
+        value = self.allowed_origins_raw
+
+        if value is None:
+            return ["*"]
+
+        if isinstance(value, list):
+            cleaned = [origin.strip() for origin in value if isinstance(origin, str) and origin.strip()]
+            return cleaned or ["*"]
+
+        # handle string values: attempt JSON parse, else treat as comma-separated list
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, list):
+                cleaned = [str(origin).strip() for origin in parsed if str(origin).strip()]
+                if cleaned:
+                    return cleaned
+        except json.JSONDecodeError:
+            pass
+
+        cleaned = [origin.strip() for origin in value.split(",") if origin.strip()]
+        return cleaned or ["*"]
 
 
 @lru_cache
