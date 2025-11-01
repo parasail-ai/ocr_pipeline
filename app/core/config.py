@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     app_name: str = "Parasail OCR Pipeline"
     environment: str = "dev"
 
-    database_url: str = "postgresql://dbadmin:Warbiscuit511!@azure-databoard-db.postgres.database.azure.com/ocr?sslmode=require"
+    database_url: str = "postgresql+asyncpg://dbadmin:Warbiscuit511!@azure-databoard-db.postgres.database.azure.com/ocr?ssl=require"
 
     azure_storage_account_url: Optional[AnyUrl] = None
     azure_blob_container: str = "contracts"

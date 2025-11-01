@@ -14,6 +14,7 @@ from app.db.models import (
     Document,
     DocumentClassification,
     DocumentContent,
+    DocumentExtraction,
     DocumentOcrResult,
     SchemaDefinition,
 )
@@ -22,6 +23,7 @@ from app.services.blob_storage import BlobStorageService
 from app.services.classifier import DocumentClassifier
 from app.services.docling import DoclingProcessor, DoclingUnavailable
 from app.services.parasail import ParasailOCRClient
+from app.services.table_extractor import TableExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +119,19 @@ async def process_document_task(
             "docling": docling_text,
         },
     )
+
+    # Extract tables and line items if Docling was successful
+    if docling_extraction:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(blob_path).suffix) as tmp_file:
+            tmp_file.write(file_bytes)
+            temp_path = Path(tmp_file.name)
+        
+        try:
+            await _extract_and_store_tables(document_id, temp_path)
+        except Exception as exc:
+            logger.exception("Table extraction failed for document %s", document_id, exc_info=exc)
+        finally:
+            temp_path.unlink(missing_ok=True)
 
     if initial_schema_id is None:
         base_text = parasail_text or docling_text
@@ -296,3 +311,60 @@ def _build_summary(parasail_text: str | None, docling_text: str | None) -> str |
     if len(corpus) <= 500:
         return corpus
     return corpus[:500] + "…"
+
+
+async def _extract_and_store_tables(document_id: uuid.UUID, file_path: Path) -> None:
+    """Extract tables and line items from document and store them"""
+    try:
+        extractor = TableExtractor()
+    except RuntimeError:
+        logger.info("Table extractor not available for document %s", document_id)
+        return
+    
+    # Extract tables
+    tables = await asyncio.to_thread(extractor.extract_tables, file_path)
+    
+    if not tables:
+        logger.info("No tables found in document %s", document_id)
+        return
+    
+    # Extract line items from tables
+    line_items = await asyncio.to_thread(extractor.extract_line_items, tables)
+    
+    # Store extractions
+    async with AsyncSessionLocal() as session:
+        extractions = []
+        
+        # Store each table
+        for table_idx, table in enumerate(tables):
+            extraction = DocumentExtraction(
+                document_id=document_id,
+                extraction_type="table",
+                source="docling",
+                data=table,
+                extraction_metadata={
+                    "table_index": table_idx,
+                    "row_count": table.get("row_count", 0),
+                    "column_count": table.get("column_count", 0),
+                }
+            )
+            extractions.append(extraction)
+        
+        # Store line items as a single extraction
+        if line_items:
+            extraction = DocumentExtraction(
+                document_id=document_id,
+                extraction_type="line_items",
+                source="docling",
+                data={"items": line_items},
+                extraction_metadata={
+                    "item_count": len(line_items),
+                    "source_tables": len(tables),
+                }
+            )
+            extractions.append(extraction)
+        
+        if extractions:
+            session.add_all(extractions)
+            await session.commit()
+            logger.info("Stored %d extractions for document %s", len(extractions), document_id)

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, JSON, String, Text
+from sqlalchemy import Column, DateTime, ForeignKey, JSON, String, Text, Boolean, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -38,6 +38,9 @@ class Document(Base):
     classifications: Mapped[list["DocumentClassification"]] = relationship(
         back_populates="document", cascade="all, delete-orphan", order_by="desc(DocumentClassification.created_at)"
     )
+    extractions: Mapped[list["DocumentExtraction"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan", order_by="desc(DocumentExtraction.created_at)"
+    )
     selected_schema: Mapped["SchemaDefinition | None"] = relationship("SchemaDefinition", foreign_keys=[selected_schema_id])
 
 
@@ -52,8 +55,13 @@ class SchemaDefinition(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     version: Mapped[int] = mapped_column(nullable=False, default=1)
+    is_template: Mapped[bool] = mapped_column(Boolean, default=False)
+    parent_schema_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("schema_definitions.id", ondelete="SET NULL"), nullable=True
+    )
 
     document_schemas: Mapped[list["DocumentSchema"]] = relationship(back_populates="schema", cascade="all, delete-orphan")
+    parent_schema: Mapped["SchemaDefinition | None"] = relationship("SchemaDefinition", remote_side=[id], foreign_keys=[parent_schema_id])
 
 
 class DocumentSchema(Base):
@@ -122,3 +130,69 @@ class DocumentOcrResult(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     document: Mapped[Document] = relationship(back_populates="ocr_results")
+
+
+class DocumentExtraction(Base):
+    """Stores structured extractions including tables and line items"""
+    __tablename__ = "document_extractions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    extraction_type: Mapped[str] = mapped_column(String(50), nullable=False)  # 'table', 'line_items', 'key_value'
+    source: Mapped[str] = mapped_column(String(100), default="docling")  # 'docling', 'parasail', 'custom'
+    data: Mapped[dict] = mapped_column(JSON, default=dict)
+    extraction_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    document: Mapped[Document] = relationship(back_populates="extractions")
+
+
+class ApiProfile(Base):
+    """User profiles for API access"""
+    __tablename__ = "api_profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    api_keys: Mapped[list["ApiKey"]] = relationship(back_populates="profile", cascade="all, delete-orphan")
+
+
+class ApiKey(Base):
+    """API keys for authentication"""
+    __tablename__ = "api_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("api_profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    key_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    key_prefix: Mapped[str] = mapped_column(String(20), nullable=False)  # First few chars for identification
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    profile: Mapped[ApiProfile] = relationship(back_populates="api_keys")
+
+
+class OcrModel(Base):
+    """Registry of available OCR models"""
+    __tablename__ = "ocr_models"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    provider: Mapped[str] = mapped_column(String(100), nullable=False)  # 'parasail', 'openai', 'custom'
+    endpoint_url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

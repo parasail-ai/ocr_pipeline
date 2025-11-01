@@ -5,36 +5,24 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 
-class DocumentMetadata(BaseModel):
-    page_count: Optional[int] = None
-    content_type: Optional[str] = None
-    extra: dict[str, Any] = Field(default_factory=dict)
-
-
-class DocumentCreate(BaseModel):
-    filename: str
-    content_type: Optional[str] = None
-    selected_model: Optional[str] = None
-    schema_id: Optional[uuid.UUID] = None
-
-
 class DocumentRead(BaseModel):
     id: uuid.UUID
     original_filename: str
-    selected_model: Optional[str] = None
-    selected_schema_id: Optional[uuid.UUID] = None
-    selected_schema: Optional["SchemaRead"] = None
+    selected_model: Optional[str]
+    selected_schema_id: Optional[uuid.UUID]
+    blob_path: str
     blob_url: str
-    status: str
     uploaded_at: datetime
+    status: str
     details: dict[str, Any]
-    last_processed_at: Optional[datetime] = None
-    detected_type: Optional[str] = None
-    detected_confidence: Optional[float] = None
-    ocr_results: list["DocumentOcrResultRead"] = Field(default_factory=list)
-    schemas: list["DocumentSchemaAssignmentRead"] = Field(default_factory=list)
-    contents: list["DocumentContentRead"] = Field(default_factory=list)
-    classifications: list["DocumentClassificationRead"] = Field(default_factory=list)
+    last_processed_at: Optional[datetime]
+    detected_type: Optional[str]
+    detected_confidence: Optional[float]
+    selected_schema: Optional["SchemaRead"] = None
+    ocr_results: list["DocumentOcrResultRead"] = []
+    schemas: list["DocumentSchemaAssignmentRead"] = []
+    contents: list["DocumentContentRead"] = []
+    classifications: list["DocumentClassificationRead"] = []
 
     class Config:
         from_attributes = True
@@ -46,10 +34,37 @@ class DocumentList(BaseModel):
 
 class DocumentOcrResultRead(BaseModel):
     id: uuid.UUID
+    document_id: uuid.UUID
     model_name: str
-    summary: Optional[str] = None
-    extracted_text: Optional[str] = None
-    raw_response: dict[str, Any] = Field(default_factory=dict)
+    raw_response: dict[str, Any]
+    extracted_text: Optional[str]
+    summary: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DocumentContentRead(BaseModel):
+    id: uuid.UUID
+    document_id: uuid.UUID
+    source: str
+    text: str
+    fragment_metadata: dict[str, Any]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DocumentClassificationRead(BaseModel):
+    id: uuid.UUID
+    document_id: uuid.UUID
+    label: str
+    confidence: Optional[float]
+    suggested_schema_id: Optional[uuid.UUID]
+    rationale: Optional[str]
+    extra: dict[str, Any]
     created_at: datetime
 
     class Config:
@@ -73,43 +88,31 @@ class DocumentApplySchemaRequest(BaseModel):
     values: dict[str, Any] = Field(default_factory=dict)
 
 
-class DocumentContentRead(BaseModel):
+class DocumentExtractionRead(BaseModel):
+    """Response model for document extractions"""
     id: uuid.UUID
+    document_id: uuid.UUID
+    extraction_type: str
     source: str
-    text: str
-    fragment_metadata: dict[str, Any]
+    data: dict[str, Any]
+    metadata: dict[str, Any]
     created_at: datetime
 
     class Config:
         from_attributes = True
 
 
-class DocumentClassificationRead(BaseModel):
-    id: uuid.UUID
-    label: str
-    confidence: Optional[float] = None
-    rationale: Optional[str] = None
-    suggested_schema_id: Optional[uuid.UUID] = None
-    extra: dict[str, Any]
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+class DocumentBase64Upload(BaseModel):
+    """Request model for uploading a document via base64"""
+    filename: str = Field(..., min_length=1, max_length=255)
+    content: str = Field(..., description="Base64 encoded document content")
+    content_type: Optional[str] = Field(None, description="MIME type of the document")
+    model_name: Optional[str] = Field(None, description="OCR model to use")
+    schema_id: Optional[uuid.UUID] = Field(None, description="Schema to apply")
 
 
+# Forward references
 from app.models.schema_definition import SchemaRead
 
-
-DocumentOcrResultRead.model_rebuild()
-DocumentContentRead.model_rebuild()
-DocumentClassificationRead.model_rebuild()
-DocumentSchemaAssignmentRead.model_rebuild(_types_namespace={"SchemaRead": SchemaRead})
-DocumentRead.model_rebuild(
-    _types_namespace={
-        "DocumentOcrResultRead": DocumentOcrResultRead,
-        "DocumentSchemaAssignmentRead": DocumentSchemaAssignmentRead,
-        "SchemaRead": SchemaRead,
-        "DocumentContentRead": DocumentContentRead,
-        "DocumentClassificationRead": DocumentClassificationRead,
-    }
-)
+DocumentRead.model_rebuild()
+DocumentSchemaAssignmentRead.model_rebuild()

@@ -1,3 +1,4 @@
+import base64
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
@@ -5,10 +6,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import Document, DocumentSchema, SchemaDefinition
+from app.api.dependencies.auth import get_api_key_required
+from app.db.models import ApiProfile, Document, DocumentExtraction, DocumentSchema, SchemaDefinition
 from app.db.session import get_db
 from app.models.document import (
     DocumentApplySchemaRequest,
+    DocumentBase64Upload,
+    DocumentExtractionRead,
     DocumentList,
     DocumentOcrResultRead,
     DocumentRead,
@@ -72,6 +76,120 @@ async def upload_document(
     )
 
     return DocumentRead.model_validate(document)
+
+
+@router.get("/{document_id}/extractions", response_model=list[DocumentExtractionRead])
+async def list_document_extractions(
+    document_id: uuid.UUID,
+    extraction_type: str | None = None,
+    db: AsyncSession = Depends(get_db)
+) -> list[DocumentExtractionRead]:
+    """
+    Get all extractions (tables, line items) for a document
+    
+    Args:
+        document_id: Document UUID
+        extraction_type: Optional filter by type ('table', 'line_items', 'key_value')
+    """
+    document = await db.get(Document, document_id, options=(selectinload(Document.extractions),))
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    
+    extractions = document.extractions
+    
+    # Filter by type if specified
+    if extraction_type:
+        extractions = [e for e in extractions if e.extraction_type == extraction_type]
+    
+    return [DocumentExtractionRead.model_validate(item) for item in extractions]
+
+
+@router.get("/{document_id}/extractions/json", response_model=dict)
+async def get_document_extractions_json(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """
+    Get all extractions as a consolidated JSON output
+    
+    Returns a structured JSON with all extracted data including:
+    - OCR text
+    - Tables
+    - Line items
+    - Key-value pairs
+    - Classifications
+    """
+    document = await db.get(
+        Document,
+        document_id,
+        options=(
+            selectinload(Document.extractions),
+            selectinload(Document.ocr_results),
+            selectinload(Document.contents),
+            selectinload(Document.classifications),
+            selectinload(Document.schemas).selectinload(DocumentSchema.schema),
+        ),
+    )
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    
+    # Build consolidated JSON output
+    output = {
+        "document_id": str(document.id),
+        "filename": document.original_filename,
+        "detected_type": document.detected_type,
+        "detected_confidence": document.detected_confidence,
+        "processed_at": document.last_processed_at.isoformat() if document.last_processed_at else None,
+        "ocr_text": None,
+        "tables": [],
+        "line_items": [],
+        "key_value_pairs": {},
+        "classifications": [],
+        "applied_schemas": [],
+    }
+    
+    # Add OCR text
+    if document.contents:
+        for content in document.contents:
+            if content.source == "parasail" or content.source == "docling":
+                output["ocr_text"] = content.text
+                break
+    
+    # Add extractions
+    for extraction in document.extractions:
+        if extraction.extraction_type == "table":
+            output["tables"].append({
+                "table_index": extraction.metadata.get("table_index"),
+                "page": extraction.metadata.get("page"),
+                "headers": extraction.data.get("headers", []),
+                "rows": extraction.data.get("rows", []),
+                "row_count": extraction.data.get("row_count", 0),
+                "column_count": extraction.data.get("column_count", 0),
+            })
+        elif extraction.extraction_type == "line_items":
+            output["line_items"] = extraction.data.get("items", [])
+        elif extraction.extraction_type == "key_value":
+            output["key_value_pairs"].update(extraction.data)
+    
+    # Add classifications
+    for classification in document.classifications:
+        output["classifications"].append({
+            "label": classification.label,
+            "confidence": classification.confidence,
+            "rationale": classification.rationale,
+            "suggested_fields": classification.extra.get("suggested_fields", []),
+        })
+    
+    # Add applied schemas
+    for schema_assignment in document.schemas:
+        output["applied_schemas"].append({
+            "schema_name": schema_assignment.schema.name if schema_assignment.schema else None,
+            "schema_category": schema_assignment.schema.category if schema_assignment.schema else None,
+            "extracted_values": schema_assignment.extracted_values,
+            "applied_at": schema_assignment.created_at.isoformat(),
+        })
+    
+    return output
 
 
 @router.get("", response_model=DocumentList)
@@ -165,3 +283,77 @@ async def apply_schema(
     await db.refresh(document, attribute_names=["selected_schema_id"])
 
     return DocumentSchemaAssignmentRead.model_validate(assignment)
+
+
+@router.post("/base64", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
+async def upload_document_base64(
+    background_tasks: BackgroundTasks,
+    payload: DocumentBase64Upload,
+    db: AsyncSession = Depends(get_db),
+    profile: ApiProfile = Depends(get_api_key_required),
+) -> DocumentRead:
+    """
+    Upload a document via base64 encoding (requires API key authentication)
+    
+    This endpoint allows programmatic document submission with base64 encoded content.
+    Requires a valid API key in the Authorization header as Bearer token.
+    """
+    # Decode base64 content
+    try:
+        file_bytes = base64.b64decode(payload.content)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid base64 content: {str(exc)}"
+        ) from exc
+    
+    # Validate schema if provided
+    schema_uuid: uuid.UUID | None = None
+    if payload.schema_id:
+        schema_exists = await db.scalar(
+            select(SchemaDefinition.id).where(SchemaDefinition.id == payload.schema_id)
+        )
+        if not schema_exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Schema not found"
+            )
+        schema_uuid = payload.schema_id
+    
+    # Upload to blob storage
+    blob_service = BlobStorageService()
+    blob_path, blob_url = blob_service.upload_document(
+        content=file_bytes,
+        filename=payload.filename,
+        content_type=payload.content_type or "application/octet-stream",
+    )
+    
+    # Create document record
+    document = Document(
+        original_filename=payload.filename,
+        selected_model=payload.model_name,
+        selected_schema_id=schema_uuid,
+        blob_path=blob_path,
+        blob_url=blob_url,
+        details={
+            "content_type": payload.content_type or "application/octet-stream",
+            "uploaded_via": "api_base64",
+            "api_profile_id": str(profile.id),
+            "api_profile_email": profile.email,
+        },
+    )
+    db.add(document)
+    await db.commit()
+    await db.refresh(document)
+    
+    # Queue background processing
+    background_tasks.add_task(
+        process_document_task,
+        document.id,
+        blob_path,
+        payload.content_type,
+        payload.model_name,
+        schema_uuid,
+    )
+    
+    return DocumentRead.model_validate(document)
