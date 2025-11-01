@@ -17,7 +17,10 @@
     <div class="app-shell">
       <header class="header">
         <h1 class="headline">Parasail OCR Pipeline</h1>
-        <md-filled-tonal-button href="https://m3.material.io/">Material 3 Guidelines</md-filled-tonal-button>
+        <div class="header-actions">
+          <md-text-button id="toggle-history">View History</md-text-button>
+          <md-filled-tonal-button href="https://m3.material.io/">Material 3 Guidelines</md-filled-tonal-button>
+        </div>
       </header>
 
       <section class="upload-card">
@@ -32,6 +35,12 @@
             <span id="file-label">No file selected</span>
           </div>
           <input id="file-input" type="file" accept=".pdf,.png,.jpg,.jpeg" hidden />
+          <label class="select-label" for="upload-schema">
+            <span>Saved schema (optional)</span>
+            <select id="upload-schema" class="select-field">
+              <option value="">Auto-detect</option>
+            </select>
+          </label>
           <label class="select-label" for="ocr-model">
             <span>OCR model</span>
             <select id="ocr-model" class="select-field">
@@ -57,6 +66,24 @@
         </div>
       </section>
 
+      <section class="history-card" id="history-card" hidden>
+        <h2 class="card-title">Document History</h2>
+        <div class="history-table-wrapper">
+          <table class="history-table" id="history-table">
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Detected Type</th>
+                <th>Schema</th>
+                <th>Status</th>
+                <th>Uploaded</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="document-detail-card" id="document-detail" hidden>
         <h2 class="card-title">Document Detail</h2>
         <div class="detail-grid">
@@ -79,6 +106,18 @@
               <span class="detail-label">Last processed</span>
               <span class="detail-value" id="detail-processed">–</span>
             </div>
+            <div class="detail-row">
+              <span class="detail-label">Detected type</span>
+              <span class="detail-value" id="detail-detected-type">–</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Detection confidence</span>
+              <span class="detail-value" id="detail-detected-confidence">–</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Selected schema</span>
+              <span class="detail-value" id="detail-selected-schema">–</span>
+            </div>
             <div class="detail-block">
               <div class="block-header">
                 <h3>OCR Output</h3>
@@ -98,12 +137,19 @@
                 <p class="schema-empty">No schemas have been applied yet.</p>
               </div>
             </div>
+            <div class="detail-block">
+              <h3>Classification Suggestions</h3>
+              <div id="classification-list" class="classification-list">
+                <p class="schema-empty">No classification suggestions yet.</p>
+              </div>
+            </div>
           </div>
         </div>
 
         <div class="schema-apply" id="schema-apply">
           <h3>Apply Schema</h3>
           <p class="schema-apply-hint">Select a saved schema and map values from the OCR output.</p>
+          <p class="schema-suggestion" id="schema-suggestion" hidden></p>
           <div class="schema-apply-controls">
             <label class="select-label" for="schema-select">
               <span>Saved schema</span>
@@ -167,6 +213,7 @@
         schemas: [],
         currentDocumentId: null,
         currentDocument: null,
+        historyVisible: false,
       };
 
       const elements = {
@@ -176,8 +223,11 @@
         uploadForm: document.getElementById("upload-form"),
         uploadProgress: document.getElementById("upload-progress"),
         uploadStatus: document.getElementById("upload-status"),
+        uploadSchema: document.getElementById("upload-schema"),
         ocrModel: document.getElementById("ocr-model"),
         documentsContainer: document.getElementById("documents-container"),
+        historyCard: document.getElementById("history-card"),
+        historyTableBody: document.querySelector("#history-table tbody"),
         documentDetail: document.getElementById("document-detail"),
         documentPreview: document.getElementById("document-preview"),
         detailFilename: document.getElementById("detail-filename"),
@@ -185,10 +235,14 @@
         detailStatus: document.getElementById("detail-status"),
         detailModel: document.getElementById("detail-model"),
         detailProcessed: document.getElementById("detail-processed"),
+        detailDetectedType: document.getElementById("detail-detected-type"),
+        detailDetectedConfidence: document.getElementById("detail-detected-confidence"),
+        detailSelectedSchema: document.getElementById("detail-selected-schema"),
         ocrTextOutput: document.getElementById("ocr-text-output"),
         copyOcrTextButton: document.getElementById("copy-ocr-text"),
         ocrResultsList: document.getElementById("ocr-results-list"),
         schemaAssignmentList: document.getElementById("schema-assignment-list"),
+        classificationList: document.getElementById("classification-list"),
         schemaApplyFields: document.getElementById("schema-apply-fields"),
         schemaSelect: document.getElementById("schema-select"),
         refreshSchemas: document.getElementById("refresh-schemas"),
@@ -197,6 +251,8 @@
         schemaFieldsContainer: document.getElementById("schema-fields"),
         addFieldButton: document.getElementById("add-field"),
         schemaFieldTemplate: document.getElementById("schema-field-template"),
+        schemaSuggestion: document.getElementById("schema-suggestion"),
+        toggleHistory: document.getElementById("toggle-history"),
       };
 
       elements.filePicker.addEventListener("click", () => elements.fileInput.click());
@@ -224,6 +280,9 @@
           if (elements.ocrModel.value) {
             formData.append("model_name", elements.ocrModel.value);
           }
+          if (elements.uploadSchema.value) {
+            formData.append("schema_id", elements.uploadSchema.value);
+          }
 
           const response = await fetch("/api/documents", {
             method: "POST",
@@ -250,6 +309,12 @@
       elements.uploadForm.addEventListener("reset", () => {
         elements.fileLabel.textContent = "No file selected";
         elements.uploadStatus.textContent = "";
+      });
+
+      elements.toggleHistory.addEventListener("click", () => {
+        state.historyVisible = !state.historyVisible;
+        elements.historyCard.hidden = !state.historyVisible;
+        elements.toggleHistory.textContent = state.historyVisible ? "Hide History" : "View History";
       });
 
       elements.copyOcrTextButton.addEventListener("click", async () => {
@@ -382,6 +447,7 @@
           const data = await response.json();
           state.documents = data.items ?? [];
           renderDocumentList();
+          renderHistoryTable();
 
           if (!state.documents.length) {
             state.currentDocumentId = null;
@@ -472,6 +538,11 @@
         elements.detailProcessed.textContent = doc.last_processed_at
           ? formatDate(doc.last_processed_at)
           : "Processing";
+        elements.detailDetectedType.textContent = doc.detected_type || "–";
+        elements.detailDetectedConfidence.textContent = doc.detected_confidence
+          ? `${Math.round(doc.detected_confidence * 100)}%`
+          : "–";
+        elements.detailSelectedSchema.textContent = doc.selected_schema?.name || "–";
 
         const baseText = deriveBaseText(doc);
         elements.ocrTextOutput.value = baseText || "";
@@ -481,6 +552,7 @@
 
         renderOcrResults(doc.ocr_results ?? []);
         renderSchemaAssignments(doc.schemas ?? []);
+        renderClassifications(doc.classifications ?? []);
 
         const selectedId = elements.schemaSelect.value;
         const schema = state.schemas.find((item) => item.id === selectedId);
@@ -489,6 +561,10 @@
           renderSchemaApplyFields(schema, doc, existing?.extracted_values ?? {});
         } else {
           renderSchemaApplyFields(null);
+        }
+
+        if (!elements.schemaSelect.value) {
+          autoSelectSuggestedSchema(doc);
         }
       }
 
@@ -556,6 +632,53 @@
 
           list.appendChild(card);
         });
+      }
+
+      function renderClassifications(items) {
+        const container = elements.classificationList;
+        container.innerHTML = "";
+
+        if (!items.length) {
+          container.innerHTML = '<p class="schema-empty">No classification suggestions yet.</p>';
+          elements.schemaSuggestion.hidden = true;
+          elements.schemaSuggestion.textContent = "";
+          return;
+        }
+
+        items.forEach((item) => {
+          const card = document.createElement("div");
+          card.className = "classification-card";
+          const confidence =
+            item.confidence !== null && item.confidence !== undefined
+              ? `${Math.round(item.confidence * 100)}%`
+              : "–";
+          card.innerHTML = `
+            <div class="classification-header">
+              <strong>${item.label}</strong>
+              <span>${confidence}</span>
+            </div>
+            <div class="classification-body">
+              <p>${escapeHtml(item.rationale || "No rationale provided.")}</p>
+              ${item.metadata?.suggested_fields ? `<p class="classification-fields"><strong>Suggested fields:</strong> ${escapeHtml(item.metadata.suggested_fields.join(', '))}</p>` : ""}
+              ${item.suggested_schema_id ? `<p class="classification-schema">Suggested schema ID: ${item.suggested_schema_id}</p>` : ""}
+            </div>
+          `;
+          container.appendChild(card);
+        });
+
+        const primary = items[0];
+        if (primary && (primary.label !== "unknown" || primary.suggested_schema_id)) {
+          const fields = Array.isArray(primary.metadata?.suggested_fields)
+            ? primary.metadata.suggested_fields.join(", ")
+            : "";
+          elements.schemaSuggestion.textContent = `Suggested type: ${primary.label} (${Math.round(
+            (primary.confidence || 0) * 100,
+          )}%)${fields ? ` • Fields: ${fields}` : ""}`;
+          elements.schemaSuggestion.hidden = false;
+        } else {
+          elements.schemaSuggestion.hidden = true;
+          elements.schemaSuggestion.textContent = "";
+        }
       }
 
       function renderSchemaApplyFields(schema, doc = null, existingValues = {}) {
@@ -644,6 +767,9 @@
         const select = elements.schemaSelect;
         const currentValue = select.value;
         select.innerHTML = '<option value="">Choose a schema</option>';
+        const uploadSelect = elements.uploadSchema;
+        const uploadValue = uploadSelect.value;
+        uploadSelect.innerHTML = '<option value="">Auto-detect</option>';
         state.schemas.forEach((schema) => {
           const option = document.createElement("option");
           option.value = schema.id;
@@ -652,6 +778,10 @@
             option.selected = true;
           }
           select.appendChild(option);
+
+          const uploadOption = option.cloneNode(true);
+          uploadOption.selected = schema.id === uploadValue;
+          uploadSelect.appendChild(uploadOption);
         });
 
         if (select.value) {
@@ -688,6 +818,58 @@
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#039;");
+      }
+
+      function renderHistoryTable() {
+        const tbody = elements.historyTableBody;
+        tbody.innerHTML = "";
+
+        if (!state.documents.length) {
+          const row = document.createElement("tr");
+          row.innerHTML = '<td colspan="5" class="history-empty">No documents yet.</td>';
+          tbody.appendChild(row);
+          return;
+        }
+
+        state.documents.forEach((doc) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${doc.original_filename}</td>
+            <td>${doc.detected_type || "–"}</td>
+            <td>${doc.selected_schema?.name || "–"}</td>
+            <td>${doc.status}</td>
+            <td>${formatDate(doc.uploaded_at)}</td>
+          `;
+          row.addEventListener("click", () => selectDocument(doc.id));
+          tbody.appendChild(row);
+        });
+      }
+
+      function autoSelectSuggestedSchema(doc) {
+        if (!doc) return;
+        const selected = elements.schemaSelect.value;
+        if (selected) return;
+
+        if (doc.selected_schema_id) {
+          elements.schemaSelect.value = doc.selected_schema_id;
+          elements.uploadSchema.value = doc.selected_schema_id;
+          const existing = doc.schemas?.find((item) => item.schema_id === doc.selected_schema_id);
+          const schema = state.schemas.find((item) => item.id === doc.selected_schema_id);
+          if (schema) {
+            renderSchemaApplyFields(schema, doc, existing?.extracted_values ?? {});
+          }
+          return;
+        }
+
+        const suggestion = doc.classifications?.find((item) => item.suggested_schema_id);
+        if (suggestion) {
+          elements.schemaSelect.value = suggestion.suggested_schema_id;
+          elements.uploadSchema.value = suggestion.suggested_schema_id;
+          const schema = state.schemas.find((item) => item.id === suggestion.suggested_schema_id);
+          if (schema) {
+            renderSchemaApplyFields(schema, doc, {});
+          }
+        }
       }
 
       async function bootstrap() {

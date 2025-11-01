@@ -15,19 +15,26 @@ class DocumentCreate(BaseModel):
     filename: str
     content_type: Optional[str] = None
     selected_model: Optional[str] = None
+    schema_id: Optional[uuid.UUID] = None
 
 
 class DocumentRead(BaseModel):
     id: uuid.UUID
     original_filename: str
     selected_model: Optional[str] = None
+    selected_schema_id: Optional[uuid.UUID] = None
+    selected_schema: Optional["SchemaRead"] = None
     blob_url: str
     status: str
     uploaded_at: datetime
     details: dict[str, Any]
     last_processed_at: Optional[datetime] = None
+    detected_type: Optional[str] = None
+    detected_confidence: Optional[float] = None
     ocr_results: list["DocumentOcrResultRead"] = Field(default_factory=list)
     schemas: list["DocumentSchemaAssignmentRead"] = Field(default_factory=list)
+    contents: list["DocumentContentRead"] = Field(default_factory=list)
+    classifications: list["DocumentClassificationRead"] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -66,15 +73,43 @@ class DocumentApplySchemaRequest(BaseModel):
     values: dict[str, Any] = Field(default_factory=dict)
 
 
+class DocumentContentRead(BaseModel):
+    id: uuid.UUID
+    source: str
+    text: str
+    fragment_metadata: dict[str, Any]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DocumentClassificationRead(BaseModel):
+    id: uuid.UUID
+    label: str
+    confidence: Optional[float] = None
+    rationale: Optional[str] = None
+    suggested_schema_id: Optional[uuid.UUID] = None
+    metadata: dict[str, Any]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 from app.models.schema_definition import SchemaRead
 
 
 DocumentOcrResultRead.model_rebuild()
+DocumentContentRead.model_rebuild()
+DocumentClassificationRead.model_rebuild()
 DocumentSchemaAssignmentRead.model_rebuild(_types_namespace={"SchemaRead": SchemaRead})
 DocumentRead.model_rebuild(
     _types_namespace={
         "DocumentOcrResultRead": DocumentOcrResultRead,
         "DocumentSchemaAssignmentRead": DocumentSchemaAssignmentRead,
         "SchemaRead": SchemaRead,
+        "DocumentContentRead": DocumentContentRead,
+        "DocumentClassificationRead": DocumentClassificationRead,
     }
 )

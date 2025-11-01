@@ -19,6 +19,7 @@ async def create_schema(payload: SchemaCreate, db: AsyncSession = Depends(get_db
 
     schema = SchemaDefinition(
         name=payload.name,
+        category=payload.category,
         description=payload.description,
         fields=[field.model_dump() for field in payload.fields],
     )
@@ -29,8 +30,12 @@ async def create_schema(payload: SchemaCreate, db: AsyncSession = Depends(get_db
 
 
 @router.get("", response_model=SchemaList)
-async def list_schemas(db: AsyncSession = Depends(get_db)) -> SchemaList:
-    result = await db.execute(select(SchemaDefinition).order_by(SchemaDefinition.created_at.desc()))
+async def list_schemas(category: str | None = None, db: AsyncSession = Depends(get_db)) -> SchemaList:
+    stmt = select(SchemaDefinition).order_by(SchemaDefinition.created_at.desc())
+    if category:
+        stmt = stmt.where(SchemaDefinition.category == category)
+
+    result = await db.execute(stmt)
     schemas = list(result.scalars().all())
     return SchemaList(items=[SchemaRead.model_validate(item) for item in schemas])
 

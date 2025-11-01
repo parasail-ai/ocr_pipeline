@@ -7,8 +7,10 @@ FastAPI-based web application for ingesting contract documents, storing them in 
 - Upload contracts via Material 3-inspired interface with real-time status updates.
 - Persist file metadata and processing status in PostgreSQL (Azure Database for PostgreSQL).
 - Store raw documents in Azure Blob Storage with background Docling extraction scaffolding.
-- Placeholder Parasail OCR client wired for OpenAI-compatible API key usage.
-- Schema builder API and UI for defining reusable key-value mappings.
+- Parasail OCR integration wired for OpenAI-compatible API key usage with selectable models.
+- Persist OCR text fragments and classification suggestions for each document.
+- Schema builder API and UI for defining reusable key-value mappings and reapplying them to documents.
+- Automatic document-type heuristics suggest schemas and fields when none is selected.
 - Swagger/OpenAPI documentation automatically exposed at `/docs` and compatible with Scalar.
 - GitHub Actions workflow for CI/CD into Azure App Service.
 
@@ -41,8 +43,9 @@ FastAPI-based web application for ingesting contract documents, storing them in 
    ```
 
 5. **Open the UI**
-   - Navigate to `http://localhost:8000/` for the Material 3 front end.
-   - API docs available at `http://localhost:8000/docs` or compatible with [Scalar](https://scalar.com/).
+- Navigate to `http://localhost:8000/` for the Material 3 front end.
+- API docs available at `http://localhost:8000/docs` or compatible with [Scalar](https://scalar.com/).
+- The `Documents` section shows current uploads, while the `Document History` table surfaces prior ingests along with detected types and schema selections.
 
 ## Project Structure
 
@@ -51,11 +54,19 @@ app/
   api/        # FastAPI routers for documents and schemas
   core/       # Configuration management
   db/         # SQLAlchemy models and session helpers
-  services/   # Azure Blob, Docling, Parasail wrappers
+  services/   # Azure Blob, Docling, Parasail, heuristic classifier
   tasks/      # Background processing tasks
   templates/  # Material 3-aligned HTML template
   static/     # CSS assets
 ```
+
+### Notable API Routes
+
+- `POST /api/documents` – upload a document, optionally specifying an OCR model and a saved schema.
+- `GET /api/documents/{id}` – retrieve full document detail, including OCR outputs, contents, and classifications.
+- `GET /api/documents/{id}/classifications` – inspect heuristic suggestions for document type and schema.
+- `POST /api/documents/{id}/schemas` – apply a named schema with extracted values.
+- `GET /api/schemas` – list saved schemas (filterable by category).
 
 ## Azure Infrastructure
 

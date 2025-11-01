@@ -3,4 +3,5 @@
 __pycache__/
 *.pyc
 .venv/
+.python_packages/
 webapp-settings.json

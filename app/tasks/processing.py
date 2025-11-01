@@ -7,11 +7,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Document, DocumentOcrResult
+from app.db.models import (
+    Document,
+    DocumentClassification,
+    DocumentContent,
+    DocumentOcrResult,
+    SchemaDefinition,
+)
 from app.db.session import AsyncSessionLocal
 from app.services.blob_storage import BlobStorageService
+from app.services.classifier import DocumentClassifier
 from app.services.docling import DoclingProcessor, DoclingUnavailable
 from app.services.parasail import ParasailOCRClient
 
@@ -23,6 +31,7 @@ async def process_document_task(
     blob_path: str,
     content_type: str | None,
     model_name: str | None,
+    initial_schema_id: uuid.UUID | None,
 ) -> None:
     """Background task that fetches a document from blob storage, runs Docling, and triggers Parasail OCR."""
     logger.info("Processing document %s", document_id)
@@ -101,6 +110,23 @@ async def process_document_task(
             summary=_build_summary(parasail_text, docling_text),
         )
 
+    await _store_document_contents(
+        document_id=document_id,
+        contents={
+            "parasail": parasail_text,
+            "docling": docling_text,
+        },
+    )
+
+    if initial_schema_id is None:
+        base_text = parasail_text or docling_text
+        if base_text:
+            await _maybe_classify_document(
+                document_id=document_id,
+                base_text=base_text,
+                snippets={"parasail": parasail_text, "docling": docling_text},
+            )
+
 
 async def _update_document_status(document_id: uuid.UUID, *, status: str, details: dict) -> None:
     async with AsyncSessionLocal() as session:  # type: AsyncSession
@@ -133,6 +159,70 @@ async def _store_ocr_result(
             summary=summary,
         )
         session.add(record)
+        await session.commit()
+
+
+async def _store_document_contents(document_id: uuid.UUID, contents: dict[str, str | None]) -> None:
+    entries = [
+        DocumentContent(
+            document_id=document_id,
+            source=source,
+            text=text,
+            fragment_metadata={"length": len(text)} if text else {},
+        )
+        for source, text in contents.items()
+        if text
+    ]
+    if not entries:
+        return
+
+    async with AsyncSessionLocal() as session:
+        session.add_all(entries)
+        await session.commit()
+
+
+async def _maybe_classify_document(
+    *,
+    document_id: uuid.UUID,
+    base_text: str,
+    snippets: dict[str, str | None],
+) -> None:
+    classifier = DocumentClassifier()
+    suggestion = await asyncio.to_thread(classifier.classify, base_text, snippets=snippets)
+
+    async with AsyncSessionLocal() as session:  # type: AsyncSession
+        document = await session.get(Document, document_id, with_for_update=True)
+        if not document:
+            return
+
+        suggested_schema_id: uuid.UUID | None = None
+        if suggestion.suggested_schema_name:
+            stmt = select(SchemaDefinition.id).where(
+                func.lower(SchemaDefinition.name) == suggestion.suggested_schema_name.lower()
+            )
+            schema_id = await session.scalar(stmt)
+            if schema_id:
+                suggested_schema_id = schema_id
+
+        classification = DocumentClassification(
+            document_id=document_id,
+            label=suggestion.label,
+            confidence=suggestion.confidence,
+            rationale=suggestion.rationale,
+            suggested_schema_id=suggested_schema_id,
+            metadata={
+                "suggested_fields": list(suggestion.suggested_fields),
+                **(suggestion.metadata or {}),
+            },
+        )
+        session.add(classification)
+
+        if document.selected_schema_id is None and suggested_schema_id:
+            document.selected_schema_id = suggested_schema_id
+        if suggestion.label and suggestion.label != "unknown":
+            document.detected_type = suggestion.label
+            document.detected_confidence = suggestion.confidence
+
         await session.commit()
 
 

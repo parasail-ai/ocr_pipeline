@@ -25,6 +25,12 @@ body {
   align-items: center;
 }
 
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
 .headline {
   font-size: clamp(2rem, 3vw, 2.5rem);
   font-weight: 600;
@@ -33,7 +39,8 @@ body {
 
 .upload-card,
 .documents-card,
-.document-detail-card {
+.document-detail-card,
+.history-card {
   border-radius: 28px;
   padding: 2rem;
   background-color: rgba(255, 255, 255, 0.85);
@@ -140,6 +147,41 @@ body {
   box-shadow: 0 2px 20px rgba(79, 55, 139, 0.06);
 }
 
+.history-card {
+  background-color: rgba(243, 240, 255, 0.92);
+}
+
+.history-table-wrapper {
+  overflow-x: auto;
+  border-radius: 20px;
+  border: 1px solid rgba(103, 80, 164, 0.2);
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+  padding: 0.9rem 1rem;
+  text-align: left;
+  font-size: 0.95rem;
+  border-bottom: 1px solid rgba(103, 80, 164, 0.1);
+}
+
+.history-table tr:hover {
+  background-color: rgba(103, 80, 164, 0.08);
+  cursor: pointer;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 1.5rem;
+  color: rgba(28, 27, 31, 0.6);
+}
+
 .document-detail-card {
   background-color: rgba(250, 248, 255, 0.92);
 }
@@ -224,13 +266,15 @@ body {
 }
 
 .ocr-results-list,
-.schema-assignment-list {
+.schema-assignment-list,
+.classification-list {
   display: grid;
   gap: 1rem;
 }
 
 .ocr-result-card,
-.schema-assignment-card {
+.schema-assignment-card,
+.classification-card {
   padding: 1rem;
   border-radius: 18px;
   background-color: rgba(233, 230, 251, 0.7);
@@ -270,6 +314,33 @@ body {
   padding: 0.75rem;
   border-radius: 12px;
   overflow-x: auto;
+}
+
+.classification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.classification-header span {
+  font-size: 0.85rem;
+  color: rgba(28, 27, 31, 0.6);
+}
+
+.classification-body {
+  margin-top: 0.6rem;
+  font-size: 0.9rem;
+  color: rgba(28, 27, 31, 0.75);
+  display: grid;
+  gap: 0.4rem;
+}
+
+.classification-fields,
+.classification-schema {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(28, 27, 31, 0.7);
 }
 
 .ghost-button {
@@ -339,6 +410,15 @@ body {
 .schema-field-input:focus {
   outline: 2px solid rgba(103, 80, 164, 0.5);
   outline-offset: 2px;
+}
+
+.schema-suggestion {
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(103, 80, 164, 0.9);
+  background-color: rgba(103, 80, 164, 0.1);
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
 }
 
 .schema-form {
