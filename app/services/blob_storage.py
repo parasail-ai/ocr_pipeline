@@ -34,7 +34,8 @@ class BlobStorageService:
     def _ensure_container(self) -> None:
         container_client = self.blob_service.get_container_client(self.container_name)
         try:
-            container_client.create_container()
+            # Create container with private access (no public access)
+            container_client.create_container(public_access=None)
             logger.info("Created missing blob container %s", self.container_name)
         except ResourceExistsError:
             pass
