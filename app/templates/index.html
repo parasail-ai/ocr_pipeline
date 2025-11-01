@@ -18,8 +18,8 @@
       <header class="header">
         <h1 class="headline">Parasail OCR Pipeline</h1>
         <div class="header-actions">
+          <md-text-button id="nav-documents">Documents</md-text-button>
           <md-text-button id="toggle-history">View History</md-text-button>
-          <md-filled-tonal-button href="https://m3.material.io/">Material 3 Guidelines</md-filled-tonal-button>
         </div>
       </header>
 
@@ -317,6 +317,10 @@
         elements.toggleHistory.textContent = state.historyVisible ? "Hide History" : "View History";
       });
 
+      document.getElementById("nav-documents").addEventListener("click", () => {
+        document.querySelector(".documents-card").scrollIntoView({ behavior: "smooth" });
+      });
+
       elements.copyOcrTextButton.addEventListener("click", async () => {
         const text = elements.ocrTextOutput.value;
         if (!text) return;
@@ -497,8 +501,18 @@
             <div class="actions">
               <span class="status-chip">${doc.status}</span>
               <md-text-button href="${doc.blob_url}" target="_blank">Open</md-text-button>
+              <md-text-button data-delete-id="${doc.id}">Delete</md-text-button>
             </div>
           `;
+          
+          // Add delete handler
+          const deleteButton = item.querySelector('[data-delete-id]');
+          deleteButton.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            if (confirm(`Delete "${doc.original_filename}"? This cannot be undone.`)) {
+              await deleteDocument(doc.id);
+            }
+          });
           item.addEventListener("click", () => selectDocument(doc.id));
           item.addEventListener("keypress", (event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -869,6 +883,24 @@
           if (schema) {
             renderSchemaApplyFields(schema, doc, {});
           }
+        }
+      }
+
+      async function deleteDocument(documentId) {
+        try {
+          const response = await fetch(`/api/documents/${documentId}`, {
+            method: "DELETE",
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to delete document");
+          }
+
+          // Reload documents list
+          await listDocuments();
+        } catch (error) {
+          alert(`Error deleting document: ${error.message}`);
+          console.error(error);
         }
       }
 
