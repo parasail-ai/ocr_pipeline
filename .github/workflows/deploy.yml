@@ -29,6 +29,12 @@ jobs:
           pip install -r requirements.txt
           python -m compileall app
 
+      - name: Vendor dependencies for App Service
+        run: |
+          mkdir -p .python_packages/lib/site-packages
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt --target .python_packages/lib/site-packages
+
       - name: Archive build
         run: |
           zip -r release.zip . -x '*.git*' '*__pycache__*' '*release.zip*'

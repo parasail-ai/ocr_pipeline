@@ -95,6 +95,8 @@ The workflow `.github/workflows/deploy.yml` packages the application and deploys
 Configure repository secrets:
 - `AZURE_WEBAPP_PUBLISH_PROFILE`: Publish profile XML exported from the Azure Portal for `parasail-ocr-pipeline`.
 
+The workflow vendors Python dependencies into `.python_packages/lib/site-packages` before zipping the artifact so Azure App Service can run the app without rebuilding dependencies on each deployment.
+
 Optional environment variables for configuration can be set in the App Service configuration blade or through infrastructure templates.
 
 ## Parasail OCR Models
