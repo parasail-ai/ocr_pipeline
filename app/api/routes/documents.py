@@ -1,4 +1,5 @@
 import base64
+import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
@@ -23,6 +24,7 @@ from app.models.document import (
 from app.services.blob_storage import BlobStorageService
 from app.tasks.processing import process_document_task
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
@@ -283,6 +285,39 @@ async def apply_schema(
     await db.refresh(document, attribute_names=["selected_schema_id"])
 
     return DocumentSchemaAssignmentRead.model_validate(assignment)
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    Delete a document and all its related data
+    
+    This will:
+    - Delete the document record from the database
+    - Delete all related data (OCR results, contents, classifications, extractions, schema assignments)
+    - Delete the document from blob storage
+    """
+    document = await db.get(Document, document_id)
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    
+    blob_path = document.blob_path
+    
+    # Delete from database (cascading deletes will handle related records)
+    await db.delete(document)
+    await db.commit()
+    
+    # Delete from blob storage
+    if blob_path:
+        try:
+            blob_service = BlobStorageService()
+            blob_service.delete_document(blob_path)
+        except Exception as e:
+            # Log error but don't fail the request since DB record is already deleted
+            logger.error("Failed to delete blob %s: %s", blob_path, str(e))
 
 
 @router.post("/base64", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)

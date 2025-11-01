@@ -68,3 +68,13 @@ class BlobStorageService:
         blob_client = self.blob_service.get_blob_client(container=self.container_name, blob=blob_path)
         stream = blob_client.download_blob()
         return stream.readall()
+
+    def delete_document(self, blob_path: str) -> None:
+        """Delete a document from blob storage."""
+        blob_client = self.blob_service.get_blob_client(container=self.container_name, blob=blob_path)
+        try:
+            blob_client.delete_blob()
+            logger.info("Deleted blob %s from container %s", blob_path, self.container_name)
+        except Exception as e:
+            logger.error("Failed to delete blob %s: %s", blob_path, str(e))
+            raise
