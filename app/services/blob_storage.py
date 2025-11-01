@@ -32,13 +32,20 @@ class BlobStorageService:
         self._ensure_container()
 
     def _ensure_container(self) -> None:
+        """Ensure the container exists. If it already exists, this is a no-op."""
         container_client = self.blob_service.get_container_client(self.container_name)
         try:
-            # Create container with private access (no public access)
-            container_client.create_container(public_access=None)
-            logger.info("Created missing blob container %s", self.container_name)
-        except ResourceExistsError:
-            pass
+            # Check if container exists first
+            container_client.get_container_properties()
+            logger.info("Container %s already exists", self.container_name)
+        except Exception:
+            # Container doesn't exist, create it with private access
+            try:
+                container_client.create_container(public_access=None)
+                logger.info("Created container %s with private access", self.container_name)
+            except Exception as e:
+                logger.error("Failed to create container %s: %s", self.container_name, str(e))
+                raise
 
     def upload_document(self, content: bytes, filename: str, content_type: Optional[str] = None) -> tuple[str, str]:
         blob_name = f"{uuid.uuid4()}/{filename}"
@@ -48,7 +55,9 @@ class BlobStorageService:
         content_settings = ContentSettings(content_type=content_type or "application/octet-stream")
         blob_client.upload_blob(data_stream, overwrite=True, content_settings=content_settings)
 
-        blob_url = blob_client.url
+        # Return the blob path and a placeholder URL (actual access will be through authenticated methods)
+        # blob_client.url can fail when public access is not permitted
+        blob_url = f"https://{self.blob_service.account_name}.blob.core.windows.net/{self.container_name}/{blob_name}"
         return blob_name, blob_url
 
     def get_document_url(self, blob_path: str) -> str:
