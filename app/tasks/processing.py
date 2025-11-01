@@ -210,7 +210,7 @@ async def _maybe_classify_document(
             confidence=suggestion.confidence,
             rationale=suggestion.rationale,
             suggested_schema_id=suggested_schema_id,
-            metadata={
+            extra={
                 "suggested_fields": list(suggestion.suggested_fields),
                 **(suggestion.metadata or {}),
             },

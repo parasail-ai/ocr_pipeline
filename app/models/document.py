@@ -90,7 +90,7 @@ class DocumentClassificationRead(BaseModel):
     confidence: Optional[float] = None
     rationale: Optional[str] = None
     suggested_schema_id: Optional[uuid.UUID] = None
-    metadata: dict[str, Any]
+    extra: dict[str, Any]
     created_at: datetime
 
     class Config:

@@ -659,7 +659,7 @@
             </div>
             <div class="classification-body">
               <p>${escapeHtml(item.rationale || "No rationale provided.")}</p>
-              ${item.metadata?.suggested_fields ? `<p class="classification-fields"><strong>Suggested fields:</strong> ${escapeHtml(item.metadata.suggested_fields.join(', '))}</p>` : ""}
+              ${item.extra?.suggested_fields ? `<p class="classification-fields"><strong>Suggested fields:</strong> ${escapeHtml(item.extra.suggested_fields.join(', '))}</p>` : ""}
               ${item.suggested_schema_id ? `<p class="classification-schema">Suggested schema ID: ${item.suggested_schema_id}</p>` : ""}
             </div>
           `;
@@ -668,8 +668,8 @@
 
         const primary = items[0];
         if (primary && (primary.label !== "unknown" || primary.suggested_schema_id)) {
-          const fields = Array.isArray(primary.metadata?.suggested_fields)
-            ? primary.metadata.suggested_fields.join(", ")
+          const fields = Array.isArray(primary.extra?.suggested_fields)
+            ? primary.extra.suggested_fields.join(", ")
             : "";
           elements.schemaSuggestion.textContent = `Suggested type: ${primary.label} (${Math.round(
             (primary.confidence || 0) * 100,
