@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ app_name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Flex:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/main.css" />
+    <script type="module" src="https://esm.run/@material/web/all.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="header">
+        <h1 class="headline">Parasail OCR Pipeline</h1>
+        <md-filled-tonal-button href="https://m3.material.io/">Material 3 Guidelines</md-filled-tonal-button>
+      </header>
+
+      <section class="upload-card">
+        <h2 class="card-title">Upload Contract</h2>
+        <p>
+          Add a contract PDF to store it in Azure Blob Storage and kick off the OCR pipeline. You can track processing
+          status in the document list below.
+        </p>
+        <form id="upload-form">
+          <div class="file-input">
+            <md-filled-button type="button" id="file-picker">Select file</md-filled-button>
+            <span id="file-label">No file selected</span>
+          </div>
+          <input id="file-input" type="file" accept=".pdf,.png,.jpg,.jpeg" hidden />
+          <label class="select-label" for="ocr-model">
+            <span>OCR model</span>
+            <select id="ocr-model" class="select-field">
+              <option value="">Docling only (skip Parasail OCR)</option>
+              <option value="parasail-matt-ocr-1-dots">parasail-matt-ocr-1-dots</option>
+              <option value="parasail-matt-ocr-2-deepseekocr">parasail-matt-ocr-2-deepseekocr</option>
+              <option value="parasail-mattc-ocr-4-lighton">parasail-mattc-ocr-4-lighton</option>
+            </select>
+          </label>
+          <div class="actions">
+            <md-filled-tonal-button type="submit">Upload</md-filled-tonal-button>
+            <md-outlined-button type="reset">Reset</md-outlined-button>
+          </div>
+        </form>
+        <md-linear-progress id="upload-progress" indeterminate hidden></md-linear-progress>
+        <p id="upload-status"></p>
+      </section>
+
+      <section class="documents-card">
+        <h2 class="card-title">Documents</h2>
+        <div id="documents-container" class="document-list">
+          <div class="schema-empty">No documents yet. Upload a contract to get started.</div>
+        </div>
+      </section>
+
+      <section class="document-detail-card" id="document-detail" hidden>
+        <h2 class="card-title">Document Detail</h2>
+        <div class="detail-grid">
+          <div class="preview-panel">
+            <iframe id="document-preview" title="Document preview" class="preview-frame"></iframe>
+          </div>
+          <div class="analysis-panel">
+            <div class="detail-header">
+              <div>
+                <p class="detail-filename" id="detail-filename"></p>
+                <p class="detail-meta" id="detail-meta"></p>
+              </div>
+              <span class="status-chip" id="detail-status"></span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Parasail model</span>
+              <span class="detail-value" id="detail-model">–</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Last processed</span>
+              <span class="detail-value" id="detail-processed">–</span>
+            </div>
+            <div class="detail-block">
+              <div class="block-header">
+                <h3>OCR Output</h3>
+                <button type="button" class="ghost-button" id="copy-ocr-text">Copy text</button>
+              </div>
+              <textarea id="ocr-text-output" class="text-output" readonly placeholder="OCR output will appear here once processing finishes."></textarea>
+            </div>
+            <div class="detail-block">
+              <h3>OCR Runs</h3>
+              <div id="ocr-results-list" class="ocr-results-list">
+                <p class="schema-empty">No Parasail OCR runs for this document yet.</p>
+              </div>
+            </div>
+            <div class="detail-block">
+              <h3>Applied Schemas</h3>
+              <div id="schema-assignment-list" class="schema-assignment-list">
+                <p class="schema-empty">No schemas have been applied yet.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="schema-apply" id="schema-apply">
+          <h3>Apply Schema</h3>
+          <p class="schema-apply-hint">Select a saved schema and map values from the OCR output.</p>
+          <div class="schema-apply-controls">
+            <label class="select-label" for="schema-select">
+              <span>Saved schema</span>
+              <select id="schema-select" class="select-field">
+                <option value="">Choose a schema</option>
+              </select>
+            </label>
+            <button type="button" class="ghost-button" id="refresh-schemas">Refresh</button>
+          </div>
+          <div id="schema-apply-fields" class="schema-apply-fields">
+            <p class="schema-empty">Select a schema to map values.</p>
+          </div>
+          <div class="actions">
+            <md-filled-button id="apply-schema-button" type="button">Apply Schema</md-filled-button>
+          </div>
+        </div>
+      </section>
+
+      <section class="schema-card">
+        <h2 class="card-title">Schema Builder</h2>
+        <p>
+          Define reusable key-value schemas for your contracts. Schemas will be stored in PostgreSQL and can be applied
+          to future uploads.
+        </p>
+        <form id="schema-form" class="schema-form">
+          <md-filled-text-field id="schema-name" label="Schema name" required></md-filled-text-field>
+          <md-filled-text-field id="schema-description" label="Description"></md-filled-text-field>
+
+          <div class="schema-fields" id="schema-fields">
+            <div class="schema-empty">No fields yet. Add your first field below.</div>
+          </div>
+
+          <div class="actions">
+            <md-outlined-button id="add-field" type="button">Add Field</md-outlined-button>
+            <md-filled-button type="submit">Save Schema</md-filled-button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <template id="schema-field-template">
+      <div class="schema-field-group">
+        <md-filled-text-field label="Key" data-field="key" required></md-filled-text-field>
+        <md-filled-text-field label="Description" data-field="description"></md-filled-text-field>
+        <md-outlined-select label="Value Type" data-field="value_type">
+          <md-select-option selected value="string"><div slot="headline">String</div></md-select-option>
+          <md-select-option value="number"><div slot="headline">Number</div></md-select-option>
+          <md-select-option value="date"><div slot="headline">Date</div></md-select-option>
+          <md-select-option value="boolean"><div slot="headline">Boolean</div></md-select-option>
+        </md-outlined-select>
+        <md-switch data-field="required">
+          <div slot="label">Required field</div>
+        </md-switch>
+        <md-outlined-button type="button" data-action="remove">Remove</md-outlined-button>
+      </div>
+    </template>
+
+    <script type="module">
+      const state = {
+        documents: [],
+        schemas: [],
+        currentDocumentId: null,
+        currentDocument: null,
+      };
+
+      const elements = {
+        fileInput: document.getElementById("file-input"),
+        fileLabel: document.getElementById("file-label"),
+        filePicker: document.getElementById("file-picker"),
+        uploadForm: document.getElementById("upload-form"),
+        uploadProgress: document.getElementById("upload-progress"),
+        uploadStatus: document.getElementById("upload-status"),
+        ocrModel: document.getElementById("ocr-model"),
+        documentsContainer: document.getElementById("documents-container"),
+        documentDetail: document.getElementById("document-detail"),
+        documentPreview: document.getElementById("document-preview"),
+        detailFilename: document.getElementById("detail-filename"),
+        detailMeta: document.getElementById("detail-meta"),
+        detailStatus: document.getElementById("detail-status"),
+        detailModel: document.getElementById("detail-model"),
+        detailProcessed: document.getElementById("detail-processed"),
+        ocrTextOutput: document.getElementById("ocr-text-output"),
+        copyOcrTextButton: document.getElementById("copy-ocr-text"),
+        ocrResultsList: document.getElementById("ocr-results-list"),
+        schemaAssignmentList: document.getElementById("schema-assignment-list"),
+        schemaApplyFields: document.getElementById("schema-apply-fields"),
+        schemaSelect: document.getElementById("schema-select"),
+        refreshSchemas: document.getElementById("refresh-schemas"),
+        applySchemaButton: document.getElementById("apply-schema-button"),
+        schemaForm: document.getElementById("schema-form"),
+        schemaFieldsContainer: document.getElementById("schema-fields"),
+        addFieldButton: document.getElementById("add-field"),
+        schemaFieldTemplate: document.getElementById("schema-field-template"),
+      };
+
+      elements.filePicker.addEventListener("click", () => elements.fileInput.click());
+      elements.fileInput.addEventListener("change", () => {
+        if (elements.fileInput.files.length) {
+          elements.fileLabel.textContent = elements.fileInput.files[0].name;
+        } else {
+          elements.fileLabel.textContent = "No file selected";
+        }
+      });
+
+      elements.uploadForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!elements.fileInput.files.length) {
+          elements.uploadStatus.textContent = "Please select a file first.";
+          return;
+        }
+
+        elements.uploadProgress.hidden = false;
+        elements.uploadStatus.textContent = "Uploading...";
+
+        try {
+          const formData = new FormData();
+          formData.append("file", elements.fileInput.files[0]);
+          if (elements.ocrModel.value) {
+            formData.append("model_name", elements.ocrModel.value);
+          }
+
+          const response = await fetch("/api/documents", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            const message = data.detail || "Upload failed";
+            throw new Error(message);
+          }
+
+          elements.uploadStatus.textContent = "Upload complete. Document is processing.";
+          elements.uploadForm.reset();
+          elements.fileLabel.textContent = "No file selected";
+          await listDocuments();
+        } catch (error) {
+          elements.uploadStatus.textContent = `Upload error: ${error.message}`;
+        } finally {
+          elements.uploadProgress.hidden = true;
+        }
+      });
+
+      elements.uploadForm.addEventListener("reset", () => {
+        elements.fileLabel.textContent = "No file selected";
+        elements.uploadStatus.textContent = "";
+      });
+
+      elements.copyOcrTextButton.addEventListener("click", async () => {
+        const text = elements.ocrTextOutput.value;
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          elements.copyOcrTextButton.textContent = "Copied!";
+          setTimeout(() => (elements.copyOcrTextButton.textContent = "Copy text"), 1500);
+        } catch (error) {
+          console.error(error);
+        }
+      });
+
+      elements.refreshSchemas.addEventListener("click", () => fetchSchemas(true));
+      elements.schemaSelect.addEventListener("change", () => {
+        const selectedId = elements.schemaSelect.value;
+        const schema = state.schemas.find((item) => item.id === selectedId);
+        if (!state.currentDocument) {
+          renderSchemaApplyFields(null);
+          return;
+        }
+        const existing = state.currentDocument.schemas?.find((item) => item.schema_id === selectedId);
+        renderSchemaApplyFields(schema ?? null, state.currentDocument, existing?.extracted_values ?? {});
+      });
+
+      elements.applySchemaButton.addEventListener("click", async () => {
+        if (!state.currentDocumentId) {
+          alert("Select a document first.");
+          return;
+        }
+        const schemaId = elements.schemaSelect.value;
+        if (!schemaId) {
+          alert("Choose a schema before applying it.");
+          return;
+        }
+
+        const fields = elements.schemaApplyFields.querySelectorAll("[data-field-key]");
+        if (!fields.length) {
+          alert("Add schema fields or select a different schema.");
+          return;
+        }
+
+        const values = {};
+        fields.forEach((field) => {
+          if (field.type === "checkbox") {
+            values[field.dataset.fieldKey] = field.checked;
+          } else {
+            values[field.dataset.fieldKey] = field.value;
+          }
+        });
+
+        try {
+          const response = await fetch(`/api/documents/${state.currentDocumentId}/schemas`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ schema_id: schemaId, values }),
+          });
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail ?? "Could not apply schema");
+          }
+
+          await selectDocument(state.currentDocumentId);
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+
+      elements.addFieldButton.addEventListener("click", () => {
+        const content = elements.schemaFieldTemplate.content.cloneNode(true);
+        const group = content.querySelector(".schema-field-group");
+        const removeButton = group.querySelector('[data-action="remove"]');
+        removeButton.addEventListener("click", () => {
+          group.remove();
+          if (!elements.schemaFieldsContainer.querySelector(".schema-field-group")) {
+            elements.schemaFieldsContainer.innerHTML =
+              '<div class="schema-empty">No fields yet. Add your first field below.</div>';
+          }
+        });
+        const emptyState = elements.schemaFieldsContainer.querySelector(".schema-empty");
+        if (emptyState) emptyState.remove();
+        elements.schemaFieldsContainer.appendChild(group);
+      });
+
+      elements.schemaForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const fields = Array.from(elements.schemaFieldsContainer.querySelectorAll(".schema-field-group")).map(
+          (group) => ({
+            key: group.querySelector('[data-field="key"]').value,
+            description: group.querySelector('[data-field="description"]').value,
+            value_type: group.querySelector('[data-field="value_type"]').value,
+            required: group.querySelector('[data-field="required"]').selected,
+          }),
+        );
+
+        const payload = {
+          name: document.getElementById("schema-name").value,
+          description: document.getElementById("schema-description").value,
+          fields,
+        };
+
+        try {
+          const response = await fetch("/api/schemas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail ?? "Could not save schema");
+          }
+          elements.schemaForm.reset();
+          elements.schemaFieldsContainer.innerHTML =
+            '<div class="schema-empty">No fields yet. Add your first field below.</div>';
+          await fetchSchemas(true);
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+
+      async function listDocuments() {
+        try {
+          const response = await fetch("/api/documents");
+          if (!response.ok) throw new Error("Unable to load documents");
+
+          const data = await response.json();
+          state.documents = data.items ?? [];
+          renderDocumentList();
+
+          if (!state.documents.length) {
+            state.currentDocumentId = null;
+            state.currentDocument = null;
+            elements.documentDetail.hidden = true;
+            return;
+          }
+
+          if (state.currentDocumentId) {
+            const stillExists = state.documents.some((item) => item.id === state.currentDocumentId);
+            if (!stillExists) {
+              state.currentDocumentId = null;
+              state.currentDocument = null;
+              elements.documentDetail.hidden = true;
+            }
+          }
+
+          if (!state.currentDocumentId && state.documents.length) {
+            await selectDocument(state.documents[0].id);
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      function renderDocumentList() {
+        const container = elements.documentsContainer;
+        container.innerHTML = "";
+
+        if (!state.documents.length) {
+          container.innerHTML =
+            '<div class="schema-empty">No documents yet. Upload a contract to get started.</div>';
+          return;
+        }
+
+        state.documents.forEach((doc) => {
+          const item = document.createElement("div");
+          item.className = `document-item${doc.id === state.currentDocumentId ? " active" : ""}`;
+          item.setAttribute("role", "button");
+          item.tabIndex = 0;
+          item.innerHTML = `
+            <div>
+              <div class="document-name">${doc.original_filename}</div>
+              <div class="document-meta">${formatDate(doc.uploaded_at)}</div>
+              <div class="document-meta">Model: ${doc.selected_model || "Docling only"}</div>
+            </div>
+            <div class="actions">
+              <span class="status-chip">${doc.status}</span>
+              <md-text-button href="${doc.blob_url}" target="_blank">Open</md-text-button>
+            </div>
+          `;
+          item.addEventListener("click", () => selectDocument(doc.id));
+          item.addEventListener("keypress", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              selectDocument(doc.id);
+            }
+          });
+          container.appendChild(item);
+        });
+      }
+
+      async function selectDocument(documentId) {
+        try {
+          const response = await fetch(`/api/documents/${documentId}`);
+          if (!response.ok) throw new Error("Document not found");
+
+          const document = await response.json();
+          state.currentDocumentId = document.id;
+          state.currentDocument = document;
+
+          renderDocumentDetail(document);
+          renderDocumentList();
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      function renderDocumentDetail(doc) {
+        if (!doc) return;
+        elements.documentDetail.hidden = false;
+
+        elements.documentPreview.src = doc.blob_url;
+        elements.detailFilename.textContent = doc.original_filename;
+        elements.detailMeta.textContent = `${formatDate(doc.uploaded_at)} · ${doc.details?.content_type ?? "Unknown type"}`;
+        elements.detailStatus.textContent = doc.status;
+        elements.detailModel.textContent = doc.selected_model || "Docling only";
+        elements.detailProcessed.textContent = doc.last_processed_at
+          ? formatDate(doc.last_processed_at)
+          : "Processing";
+
+        const baseText = deriveBaseText(doc);
+        elements.ocrTextOutput.value = baseText || "";
+        elements.ocrTextOutput.placeholder = baseText
+          ? ""
+          : "OCR output will appear here once processing finishes.";
+
+        renderOcrResults(doc.ocr_results ?? []);
+        renderSchemaAssignments(doc.schemas ?? []);
+
+        const selectedId = elements.schemaSelect.value;
+        const schema = state.schemas.find((item) => item.id === selectedId);
+        const existing = doc.schemas?.find((item) => item.schema_id === selectedId);
+        if (schema) {
+          renderSchemaApplyFields(schema, doc, existing?.extracted_values ?? {});
+        } else {
+          renderSchemaApplyFields(null);
+        }
+      }
+
+      function renderOcrResults(results) {
+        const list = elements.ocrResultsList;
+        list.innerHTML = "";
+
+        if (!results.length) {
+          list.innerHTML = '<p class="schema-empty">No Parasail OCR runs for this document yet.</p>';
+          return;
+        }
+
+        results.forEach((result) => {
+          const card = document.createElement("div");
+          card.className = "ocr-result-card";
+          const textPreview = (result.summary || result.extracted_text || "").trim();
+          const truncated = textPreview
+            ? textPreview.length > 280
+              ? `${textPreview.slice(0, 280)}…`
+              : textPreview
+            : "No extracted text captured.";
+          card.innerHTML = `
+            <div class="result-header">
+              <div>
+                <strong>${result.model_name}</strong>
+                <span>${formatDate(result.created_at)}</span>
+              </div>
+            </div>
+            <p class="result-preview">${escapeHtml(truncated)}</p>
+          `;
+          list.appendChild(card);
+        });
+      }
+
+      function renderSchemaAssignments(assignments) {
+        const list = elements.schemaAssignmentList;
+        list.innerHTML = "";
+
+        if (!assignments.length) {
+          list.innerHTML = '<p class="schema-empty">No schemas have been applied yet.</p>';
+          return;
+        }
+
+        assignments.forEach((assignment) => {
+          const card = document.createElement("div");
+          card.className = "schema-assignment-card";
+          const name = assignment.schema?.name ?? "Schema";
+          card.innerHTML = `
+            <div class="assignment-header">
+              <div>
+                <strong>${name}</strong>
+                <span>${formatDate(assignment.created_at)}</span>
+              </div>
+              <button type="button" class="ghost-button" data-schema-id="${assignment.schema_id}">Load values</button>
+            </div>
+            <pre class="assignment-values">${escapeHtml(JSON.stringify(assignment.extracted_values, null, 2))}</pre>
+          `;
+
+          const loadButton = card.querySelector("button");
+          loadButton.addEventListener("click", () => {
+            elements.schemaSelect.value = assignment.schema_id;
+            const schema = state.schemas.find((item) => item.id === assignment.schema_id);
+            renderSchemaApplyFields(schema ?? null, state.currentDocument, assignment.extracted_values ?? {});
+          });
+
+          list.appendChild(card);
+        });
+      }
+
+      function renderSchemaApplyFields(schema, doc = null, existingValues = {}) {
+        const container = elements.schemaApplyFields;
+        container.innerHTML = "";
+
+        if (!schema) {
+          container.innerHTML = '<p class="schema-empty">Select a schema to map values.</p>';
+          return;
+        }
+
+        const baseText = doc ? deriveBaseText(doc) : "";
+
+        schema.fields.forEach((field) => {
+          const row = document.createElement("div");
+          row.className = "schema-apply-field";
+
+          const label = document.createElement("label");
+          label.className = "schema-apply-label";
+          label.textContent = field.key;
+          row.appendChild(label);
+
+          if (field.description) {
+            const description = document.createElement("span");
+            description.className = "schema-field-help";
+            description.textContent = field.description;
+            row.appendChild(description);
+          }
+
+          let input;
+          if (Array.isArray(field.options) && field.options.length) {
+            input = document.createElement("select");
+            input.className = "schema-field-input";
+            input.dataset.fieldKey = field.key;
+            input.appendChild(new Option("Select", "", false, !existingValues[field.key]));
+            field.options.forEach((option) => {
+              input.appendChild(new Option(option, option, false, existingValues[field.key] === option));
+            });
+          } else if (field.value_type === "boolean") {
+            input = document.createElement("select");
+            input.className = "schema-field-input";
+            input.dataset.fieldKey = field.key;
+            input.appendChild(new Option("Select", "", false, existingValues[field.key] === undefined));
+            input.appendChild(new Option("True", "true", false, existingValues[field.key] === true || existingValues[field.key] === "true"));
+            input.appendChild(new Option("False", "false", false, existingValues[field.key] === false || existingValues[field.key] === "false"));
+          } else if (field.value_type === "number") {
+            input = document.createElement("input");
+            input.type = "number";
+            input.className = "schema-field-input";
+            input.dataset.fieldKey = field.key;
+            input.value = existingValues[field.key] ?? "";
+          } else {
+            const textarea = document.createElement("textarea");
+            textarea.className = "schema-field-input";
+            textarea.rows = 2;
+            textarea.dataset.fieldKey = field.key;
+            textarea.placeholder = baseText ? `Search OCR output for \"${field.key}\"` : "Enter value";
+            textarea.value = existingValues[field.key] ?? "";
+            input = textarea;
+          }
+
+          if (field.required) {
+            input.required = true;
+          }
+
+          row.appendChild(input);
+          container.appendChild(row);
+        });
+      }
+
+      async function fetchSchemas(force = false) {
+        if (!force && state.schemas.length) return;
+        try {
+          const response = await fetch("/api/schemas");
+          if (!response.ok) throw new Error("Unable to load schemas");
+
+          const data = await response.json();
+          state.schemas = data.items ?? [];
+          populateSchemaSelect();
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      function populateSchemaSelect() {
+        const select = elements.schemaSelect;
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">Choose a schema</option>';
+        state.schemas.forEach((schema) => {
+          const option = document.createElement("option");
+          option.value = schema.id;
+          option.textContent = schema.name;
+          if (schema.id === currentValue) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+
+        if (select.value) {
+          const schema = state.schemas.find((item) => item.id === select.value);
+          const existing = state.currentDocument?.schemas?.find((item) => item.schema_id === select.value);
+          renderSchemaApplyFields(schema ?? null, state.currentDocument, existing?.extracted_values ?? {});
+        } else {
+          renderSchemaApplyFields(null);
+        }
+      }
+
+      function deriveBaseText(doc) {
+        if (!doc?.details) return "";
+        const details = doc.details;
+        if (details.parasail?.text) return details.parasail.text;
+        if (details.docling_text) return details.docling_text;
+        if (details.docling?.text) return details.docling.text;
+        return "";
+      }
+
+      function formatDate(value) {
+        try {
+          return new Date(value).toLocaleString();
+        } catch (error) {
+          return value;
+        }
+      }
+
+      function escapeHtml(value) {
+        if (!value) return "";
+        return value
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      async function bootstrap() {
+        await fetchSchemas(true);
+        await listDocuments();
+      }
+
+      bootstrap();
+    </script>
+  </body>
+</html>
