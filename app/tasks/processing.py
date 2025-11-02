@@ -26,7 +26,7 @@ from app.services.blob_storage import BlobStorageService
 from app.services.classifier import DocumentClassifier
 from app.services.docling import DoclingProcessor, DoclingUnavailable
 from app.services.parasail import ParasailOCRClient
-from app.services.pdf_splitter import PDFSplitterService
+from app.services.document_converter import DocumentConverterService
 from app.services.schema_generator import SchemaGenerator
 from app.services.table_extractor import TableExtractor
 
@@ -76,42 +76,6 @@ async def process_document_task(
 
     docling_extraction: dict[str, Any] | None = None
     docling_text: str | None = None
-    docstrange_markdown: str | None = None
-    
-    # DocStrange preprocessing (runs BEFORE OCR if enabled)
-    if preprocessing == "docstrange":
-        logger.info("Running DocStrange preprocessing...")
-        try:
-            from app.services.docstrange_processor import DocStrangeProcessor
-            
-            # Save file to temp location for DocStrange processing
-            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(blob_path).suffix) as tmp_file:
-                tmp_file.write(file_bytes)
-                temp_path = Path(tmp_file.name)
-            
-            try:
-                await _update_document_status(
-                    document_id,
-                    status="preprocessing",
-                    details={"stage": "docstrange_preprocessing", "preprocessing": "docstrange"}
-                )
-                
-                processor = DocStrangeProcessor()
-                result = await asyncio.to_thread(processor.process_document, temp_path)
-                
-                docstrange_markdown = result.get("markdown", "")
-                logger.info(f"DocStrange extracted {len(docstrange_markdown)} characters")
-                
-            finally:
-                temp_path.unlink(missing_ok=True)
-                
-        except Exception as exc:
-            logger.exception("DocStrange preprocessing failed for document %s", document_id, exc_info=exc)
-            await _update_document_status(
-                document_id,
-                status="preprocessing_failed",
-                details={"stage": "docstrange_failed", "error": str(exc)}
-            )
     
     # Only use Docling if no model is specified (disabled by default)
     # Users must select a Parasail model for OCR processing
@@ -239,7 +203,6 @@ async def process_document_task(
         contents={
             "parasail": parasail_text,
             "docling": docling_text,
-            "docstrange": docstrange_markdown,
         },
     )
 
@@ -257,14 +220,14 @@ async def process_document_task(
             temp_path.unlink(missing_ok=True)
 
     # Extract key-value pairs and auto-generate schema (but don't save as reusable template)
-    # Use docstrange output if available, otherwise use parasail or docling
-    base_text = docstrange_markdown or parasail_text or docling_text
+    # Use parasail or docling text for extraction
+    base_text = parasail_text or docling_text
     if base_text:
         if initial_schema_id is None:
             await _maybe_classify_document(
                 document_id=document_id,
                 base_text=base_text,
-                snippets={"parasail": parasail_text, "docling": docling_text, "docstrange": docstrange_markdown},
+                snippets={"parasail": parasail_text, "docling": docling_text},
             )
             # Auto-generate schema for this document (not saved as reusable template)
             await _auto_generate_schema(
