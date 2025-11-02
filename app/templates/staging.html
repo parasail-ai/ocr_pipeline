@@ -120,6 +120,63 @@
         white-space: pre-wrap;
         word-wrap: break-word;
       }
+      .tab-btn {
+        padding: 1rem 1.5rem;
+        background: transparent;
+        border: none;
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        font-size: 15px;
+        font-weight: 500;
+        color: #666;
+        transition: all 0.2s;
+      }
+      .tab-btn:hover {
+        color: #1976d2;
+        background: #f5f5f5;
+      }
+      .tab-btn.active {
+        color: #1976d2;
+        border-bottom-color: #1976d2;
+        background: #e3f2fd;
+      }
+      .tab-content {
+        display: none;
+        animation: fadeIn 0.3s;
+      }
+      .tab-content.active {
+        display: block;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .schema-panel-content {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .field-item {
+        display: grid;
+        grid-template-columns: 250px 1fr;
+        gap: 1.5rem;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        background: #f9f9f9;
+        border-radius: 8px;
+        border-left: 4px solid #1976d2;
+      }
+      .field-label {
+        font-weight: 600;
+        color: #333;
+        font-size: 14px;
+      }
+      .field-value {
+        color: #666;
+        font-size: 14px;
+        word-break: break-word;
+      }
     </style>
   </head>
   <body>
@@ -153,19 +210,67 @@
         <p id="document-name"></p>
       </div>
 
-      <div class="staging-grid">
-        <!-- Document Preview -->
+      <!-- Tab Navigation -->
+      <div style="margin-bottom: 1rem; border-bottom: 2px solid #e0e0e0;">
+        <div style="display: flex; gap: 1rem;">
+          <button class="tab-btn active" onclick="switchTab('preview')" data-tab="preview">
+            📄 Original Document
+          </button>
+          <button class="tab-btn" onclick="switchTab('ocr')" data-tab="ocr">
+            📝 OCR Text
+          </button>
+          <button class="tab-btn" onclick="switchTab('fields')" data-tab="fields">
+            📊 Extracted Fields
+          </button>
+          <button class="tab-btn" onclick="switchTab('json')" data-tab="json">
+            💾 JSON Output
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Contents -->
+      <div class="tab-content active" id="tab-preview">
         <div class="preview-panel">
           <h2 class="card-title">Document Preview</h2>
-          <iframe id="document-preview" class="preview-frame" title="Document preview"></iframe>
+          <iframe id="document-preview" class="preview-frame" title="Document preview" style="width: 100%; height: 700px; border: 1px solid #e0e0e0; border-radius: 8px;"></iframe>
         </div>
+      </div>
 
-        <!-- OCR Text Output -->
+      <div class="tab-content" id="tab-ocr" style="display: none;">
         <div class="status-panel">
           <h2 class="card-title">OCR Text Output</h2>
-          <div id="ocr-text-display" style="background: #f5f5f5; padding: 1rem; border-radius: 8px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 12px; line-height: 1.6;">
+          <div id="ocr-text-display" style="background: #f5f5f5; padding: 1rem; border-radius: 8px; max-height: 700px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 13px; line-height: 1.6;">
             Waiting for OCR processing...
           </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-fields" style="display: none;">
+        <div class="schema-panel-content">
+          <h2 class="card-title">Extracted Fields</h2>
+          <div id="extracted-fields-display">
+            <p style="color: #666;">Processing document... Fields will appear here once extraction is complete.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-json" style="display: none;">
+        <div class="status-panel">
+          <h2 class="card-title">JSON Structured Output</h2>
+          <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+            <button onclick="copyJSON()" style="padding: 0.5rem 1rem; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              📋 Copy JSON
+            </button>
+            <button onclick="downloadJSON()" style="padding: 0.5rem 1rem; background: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              ⬇️ Download JSON
+            </button>
+          </div>
+          <pre id="json-output" style="background: #1e1e1e; color: #d4d4d4; padding: 1.5rem; border-radius: 8px; max-height: 700px; overflow: auto; font-size: 13px; line-height: 1.6;">
+{
+  "status": "processing",
+  "message": "Waiting for document processing to complete..."
+}
+          </pre>
         </div>
       </div>
 
@@ -466,6 +571,179 @@
           }
         }
       });
+
+      // Tab switching
+      window.switchTab = function(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          btn.classList.remove('active');
+          if (btn.getAttribute('data-tab') === tabName) {
+            btn.classList.add('active');
+          }
+        });
+
+        // Update tab contents
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.classList.remove('active');
+          content.style.display = 'none';
+        });
+
+        const activeTab = document.getElementById(`tab-${tabName}`);
+        if (activeTab) {
+          activeTab.classList.add('active');
+          activeTab.style.display = 'block';
+        }
+
+        // Update content when switching to tabs
+        if (tabName === 'fields') {
+          updateExtractedFieldsTab();
+        } else if (tabName === 'json') {
+          updateJSONTab();
+        }
+      };
+
+      function updateExtractedFieldsTab() {
+        const fieldsDisplay = document.getElementById('extracted-fields-display');
+        
+        if (!document || !document.schemas || document.schemas.length === 0) {
+          fieldsDisplay.innerHTML = '<p style="color: #999; padding: 2rem; text-align: center;">No extracted fields yet. Processing in progress...</p>';
+          return;
+        }
+
+        const schema = document.schemas[0];
+        const values = schema.extracted_values || {};
+        const schemaInfo = schema.schema;
+
+        if (Object.keys(values).length === 0) {
+          fieldsDisplay.innerHTML = '<p style="color: #999; padding: 2rem; text-align: center;">No fields extracted from this document.</p>';
+          return;
+        }
+
+        let html = '';
+        if (schemaInfo) {
+          html += `<div style="margin-bottom: 1.5rem; padding: 1rem; background: #e3f2fd; border-radius: 8px;">
+            <h3 style="margin: 0 0 0.5rem 0; color: #1976d2;">Schema: ${schemaInfo.name}</h3>
+            <p style="margin: 0; color: #666; font-size: 14px;">${schemaInfo.description || 'Auto-generated schema'}</p>
+          </div>`;
+        }
+
+        html += '<div style="margin-top: 1rem;">';
+        Object.entries(values).forEach(([key, value]) => {
+          const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          html += `
+            <div class="field-item">
+              <div class="field-label">${displayKey}</div>
+              <div class="field-value">${value || '<em style="color: #999;">No value</em>'}</div>
+            </div>
+          `;
+        });
+        html += '</div>';
+
+        fieldsDisplay.innerHTML = html;
+      }
+
+      function updateJSONTab() {
+        const jsonOutput = document.getElementById('json-output');
+        
+        if (!document) {
+          jsonOutput.textContent = JSON.stringify({
+            status: "loading",
+            message: "Loading document data..."
+          }, null, 2);
+          return;
+        }
+
+        // Build comprehensive JSON output
+        const output = {
+          document_id: document.id,
+          filename: document.original_filename,
+          status: document.status,
+          uploaded_at: document.uploaded_at,
+          processed_at: document.last_processed_at,
+          detected_type: document.detected_type,
+          detected_confidence: document.detected_confidence,
+          blob_url: document.blob_url,
+          ocr_results: null,
+          extracted_fields: {},
+          schema_info: null,
+          tables: [],
+          processing_details: document.details || {}
+        };
+
+        // Add OCR text
+        if (document.contents && document.contents.length > 0) {
+          const content = document.contents.find(c => c.source === "parasail") || document.contents[0];
+          output.ocr_results = {
+            source: content.source,
+            text: content.text,
+            text_length: content.text ? content.text.length : 0
+          };
+        }
+
+        // Add extracted fields
+        if (document.schemas && document.schemas.length > 0) {
+          const schema = document.schemas[0];
+          output.extracted_fields = schema.extracted_values || {};
+          output.schema_info = {
+            schema_id: schema.schema_id,
+            schema_name: schema.schema?.name,
+            schema_category: schema.schema?.category,
+            schema_description: schema.schema?.description,
+            created_at: schema.created_at
+          };
+        }
+
+        // Add tables
+        if (document.extractions) {
+          output.tables = document.extractions
+            .filter(e => e.extraction_type === "table")
+            .map(e => ({
+              table_index: e.extraction_metadata?.table_index,
+              row_count: e.data?.row_count,
+              column_count: e.data?.column_count,
+              headers: e.data?.headers,
+              rows: e.data?.rows
+            }));
+        }
+
+        // Add model info from OCR results
+        if (document.ocr_results && document.ocr_results.length > 0) {
+          output.model_info = {
+            model_name: document.ocr_results[0].model_name,
+            duration_ms: document.ocr_results[0].duration_ms,
+            started_at: document.ocr_results[0].started_at,
+            completed_at: document.ocr_results[0].completed_at
+          };
+        }
+
+        jsonOutput.textContent = JSON.stringify(output, null, 2);
+      }
+
+      // JSON utilities
+      window.copyJSON = function() {
+        const jsonText = document.getElementById('json-output').textContent;
+        navigator.clipboard.writeText(jsonText).then(() => {
+          alert('JSON copied to clipboard!');
+        }).catch(err => {
+          console.error('Failed to copy:', err);
+          alert('Failed to copy to clipboard');
+        });
+      };
+
+      window.downloadJSON = function() {
+        if (!document) return;
+        
+        const jsonText = document.getElementById('json-output').textContent;
+        const blob = new Blob([jsonText], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = window.document.createElement('a');
+        a.href = url;
+        a.download = `${document.original_filename || 'document'}_extracted.json`;
+        window.document.body.appendChild(a);
+        a.click();
+        window.document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
 
       // Start polling
       loadDocument();
