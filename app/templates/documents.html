@@ -540,6 +540,10 @@
     <nav class="navbar">
         <div class="container">
             <div class="nav-brand">
+                <a href="https://parasail.io" target="_blank" style="color: var(--primary-color); text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    Parasail
+                </a>
+                <span style="color: #ccc; margin: 0 8px;">|</span>
                 <span class="logo-icon">📄</span>
                 OCR Pipeline
             </div>
@@ -642,8 +646,8 @@
         // Load documents on page load
         document.addEventListener('DOMContentLoaded', async () => {
             await checkAdminStatus();
+            await loadFolders();
             loadDocuments();
-            loadFolders();
         });
         
         async function checkAdminStatus() {
@@ -801,9 +805,13 @@
         function filterDocumentsByFolder(documents) {
             let filtered = documents;
             
+            console.log('Filtering documents. isAdmin:', isAdmin, 'trashFolderId:', trashFolderId);
+            
             // Filter out trash documents for non-admin users
             if (!isAdmin && trashFolderId) {
+                const beforeCount = filtered.length;
                 filtered = filtered.filter(doc => doc.folder_id !== trashFolderId);
+                console.log(`Filtered out ${beforeCount - filtered.length} trash documents`);
             }
             
             if (currentFolderId === 'all') {
