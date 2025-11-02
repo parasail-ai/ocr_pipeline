@@ -636,12 +636,27 @@
         let currentFolderId = 'all';
         let currentView = 'grid';
         let isTrashFolder = false;
+        let trashFolderId = null;
+        let isAdmin = false;
 
         // Load documents on page load
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAdminStatus();
             loadDocuments();
             loadFolders();
         });
+        
+        async function checkAdminStatus() {
+            try {
+                const response = await fetch('/api/auth/session');
+                if (response.ok) {
+                    const data = await response.json();
+                    isAdmin = data.is_admin || false;
+                }
+            } catch (error) {
+                console.error('Failed to check admin status:', error);
+            }
+        }
 
         async function loadDocuments() {
             try {
@@ -689,6 +704,13 @@
                 
                 const data = await response.json();
                 const folders = data.items || data;
+                
+                // Store trash folder ID if it exists
+                const trashFolder = folders.find(f => f.is_trash);
+                if (trashFolder) {
+                    trashFolderId = trashFolder.id;
+                }
+                
                 renderFolders(folders);
             } catch (error) {
                 console.log('Folders not yet available');
@@ -777,12 +799,19 @@
         }
 
         function filterDocumentsByFolder(documents) {
+            let filtered = documents;
+            
+            // Filter out trash documents for non-admin users
+            if (!isAdmin && trashFolderId) {
+                filtered = filtered.filter(doc => doc.folder_id !== trashFolderId);
+            }
+            
             if (currentFolderId === 'all') {
-                return documents;
+                return filtered;
             } else if (currentFolderId === 'uncategorized') {
-                return documents.filter(doc => !doc.folder_id);
+                return filtered.filter(doc => !doc.folder_id);
             } else {
-                return documents.filter(doc => doc.folder_id === currentFolderId);
+                return filtered.filter(doc => doc.folder_id === currentFolderId);
             }
         }
 
