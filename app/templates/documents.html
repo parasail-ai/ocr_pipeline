@@ -666,7 +666,10 @@
 
         async function loadDocuments() {
             try {
-                const response = await fetch('/api/documents');
+                // Add cache-busting parameter to ensure fresh data
+                const response = await fetch('/api/documents?_=' + Date.now(), {
+                    cache: 'no-store'
+                });
                 if (!response.ok) throw new Error('Failed to load documents');
                 
                 const data = await response.json();
@@ -675,6 +678,7 @@
                 console.log('Loaded documents:', allDocuments.length);
                 console.log('Documents with folder_id:', allDocuments.filter(d => d.folder_id).map(d => ({id: d.id, filename: d.original_filename, folder_id: d.folder_id})));
                 console.log('TrashFolderId:', trashFolderId);
+                console.log('isAdmin:', isAdmin);
                 
                 updateFolderCounts();
                 renderDocuments();

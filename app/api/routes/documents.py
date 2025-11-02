@@ -282,18 +282,31 @@ async def get_document_extractions_json(
 
 @router.get("", response_model=DocumentList)
 async def list_documents(db: AsyncSession = Depends(get_db)) -> DocumentList:
-    result = await db.execute(
-        select(Document)
-        .options(
-            selectinload(Document.selected_schema),
-            selectinload(Document.ocr_results),
-            selectinload(Document.schemas).selectinload(DocumentSchema.schema),
-            selectinload(Document.contents),
-            selectinload(Document.classifications),
-            selectinload(Document.extractions),
-        )
-        .order_by(Document.uploaded_at.desc())
+    # Get trash folder ID to exclude trashed documents
+    trash_folder_result = await db.execute(
+        select(Folder.id).where(Folder.is_trash == True)
     )
+    trash_folder_id = trash_folder_result.scalar_one_or_none()
+    
+    # Build query to exclude trashed documents
+    query = select(Document).options(
+        selectinload(Document.selected_schema),
+        selectinload(Document.ocr_results),
+        selectinload(Document.schemas).selectinload(DocumentSchema.schema),
+        selectinload(Document.contents),
+        selectinload(Document.classifications),
+        selectinload(Document.extractions),
+    )
+    
+    # Exclude documents in trash folder
+    if trash_folder_id:
+        query = query.where(
+            (Document.folder_id != trash_folder_id) | (Document.folder_id.is_(None))
+        )
+    
+    query = query.order_by(Document.uploaded_at.desc())
+    
+    result = await db.execute(query)
     documents = list(result.scalars().all())
     return DocumentList(items=[DocumentRead.model_validate(item) for item in documents])
 
