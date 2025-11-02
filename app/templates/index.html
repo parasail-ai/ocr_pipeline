@@ -544,9 +544,9 @@
                 activeModels.forEach(model => {
                     const option = document.createElement('option');
                     option.value = model.name;
-                    // Show display name, provider, and masked API key
-                    option.textContent = `${model.display_name} (${model.provider}) - ${model.endpoint_url.substring(0, 40)}${model.endpoint_url.length > 40 ? '...' : ''} [Key: ${model.api_key_preview}]`;
-                    option.title = `Endpoint: ${model.endpoint_url}\nAPI Key: ${model.api_key_preview}`;
+                    // Show display name and provider only
+                    option.textContent = `${model.display_name} (${model.provider})`;
+                    option.title = `Model: ${model.display_name}\nProvider: ${model.provider}\nEndpoint: ${model.endpoint_url}`;
                     elements.modelSelect.appendChild(option);
                 });
             } catch (error) {
