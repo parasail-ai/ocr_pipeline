@@ -161,11 +161,13 @@ async def process_document_task(
                 details={"stage": "ocr_failed", "error": str(exc)}
             )
 
+    # Update status to processing (OCR complete, but extraction still pending)
     await _update_document_status(
         document_id,
-        status="processed" if docling_extraction or parasail_response else "uploaded",
+        status="processing",
         details={
             "content_type": content_type,
+            "stage": "ocr_complete",
             "docling": docling_extraction,
             "docling_text": docling_text,
             "parasail": {
@@ -228,6 +230,14 @@ async def process_document_task(
             document_id=document_id,
             ocr_text=base_text,
         )
+    
+    # Mark as fully processed after all extraction and classification is complete
+    await _update_document_status(
+        document_id,
+        status="processed",
+        details={"stage": "complete", "extraction_complete": True}
+    )
+    logger.info(f"Document {document_id} processing complete")
 
 
 async def _update_document_status(document_id: uuid.UUID, *, status: str, details: dict) -> None:
