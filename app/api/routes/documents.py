@@ -81,7 +81,10 @@ async def upload_document(
         )
         db.add(document)
         await db.commit()
-        await db.refresh(document)
+        await db.refresh(
+            document,
+            attribute_names=["id", "original_filename", "selected_model", "blob_path", "blob_url", "uploaded_at", "status"]
+        )
         
         logger.info(f"Created document record: {document.id}")
 
@@ -101,7 +104,26 @@ async def upload_document(
             schema_uuid,
         )
 
-        return DocumentRead.model_validate(document)
+        # Return document with empty relationships since it was just created
+        return DocumentRead(
+            id=document.id,
+            original_filename=document.original_filename,
+            selected_model=document.selected_model,
+            selected_schema_id=document.selected_schema_id,
+            blob_path=document.blob_path,
+            blob_url=document.blob_url,
+            uploaded_at=document.uploaded_at,
+            status=document.status,
+            details=document.details,
+            last_processed_at=document.last_processed_at,
+            detected_type=document.detected_type,
+            detected_confidence=document.detected_confidence,
+            ocr_results=[],
+            schemas=[],
+            contents=[],
+            classifications=[],
+            selected_schema=None,
+        )
         
     except HTTPException:
         # Re-raise HTTP exceptions
