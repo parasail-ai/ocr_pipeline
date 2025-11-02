@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: '3.11'
   APP_NAME: parasail-ocr-pipeline
+  ACR_NAME: parasailocr # Will get unique suffix in Azure
 
 jobs:
   build-and-deploy:
@@ -18,37 +18,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Azure
+        uses: azure/login@v1
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Install dependencies
+      - name: Get ACR login server
+        id: acr
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          python -m compileall app
+          ACR_LOGIN_SERVER=$(az acr list --resource-group parasail-ocr-pipeline-rg --query "[0].loginServer" -o tsv)
+          echo "login_server=$ACR_LOGIN_SERVER" >> $GITHUB_OUTPUT
+          echo "ACR Login Server: $ACR_LOGIN_SERVER"
 
-      - name: Vendor dependencies for App Service
+      - name: Log in to Azure Container Registry
         run: |
-          mkdir -p .python_packages/lib/site-packages
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt --target .python_packages/lib/site-packages
-          # Copy fix_path.pth to site-packages to fix /agents/python issue at Python startup
-          cp fix_path.pth .python_packages/lib/site-packages/
+          az acr login --name $(az acr list --resource-group parasail-ocr-pipeline-rg --query "[0].name" -o tsv)
 
-      - name: Archive build
-        run: |
-          zip -r release.zip . -x '*.git*' '*__pycache__*' '*release.zip*'
-
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
         with:
-          app-name: ${{ env.APP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: release.zip
+          context: .
+          push: true
+          tags: ${{ steps.acr.outputs.login_server }}/parasail-ocr:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Restart Azure Web App
+        run: |
+          az webapp restart --resource-group parasail-ocr-pipeline-rg --name ${{ env.APP_NAME }}
 
       - name: Post-deployment health check
         if: success()
         run: |
           echo "Deployment triggered for ${{ env.APP_NAME }}"
+          echo "Container image: ${{ steps.acr.outputs.login_server }}/parasail-ocr:latest"

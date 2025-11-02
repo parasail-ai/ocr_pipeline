@@ -7,6 +7,9 @@ param appServiceName string = 'parasail-ocr-pipeline'
 @description('App Service plan name')
 param appServicePlanName string = '${appServiceName}-plan'
 
+@description('Azure Container Registry name (5-50 lowercase alphanumeric)')
+param acrName string = 'parasailocr${uniqueString(resourceGroup().id)}'
+
 @description('Unique storage account name (3-24 lowercase letters and numbers)')
 param storageAccountName string
 
@@ -107,10 +110,21 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   }
 }
 
+resource acr 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = {
+  name: acrName
+  location: location
+  sku: {
+    name: 'Basic'
+  }
+  properties: {
+    adminUserEnabled: true
+  }
+}
+
 resource webApp 'Microsoft.Web/sites@2022-09-01' = {
   name: appServiceName
   location: location
-  kind: 'app,linux'
+  kind: 'app,linux,container'
   identity: {
     type: 'SystemAssigned'
   }
@@ -118,14 +132,25 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
     httpsOnly: true
     serverFarmId: appServicePlan.id
     siteConfig: {
-      linuxFxVersion: 'PYTHON|3.11'
+      linuxFxVersion: 'DOCKER|${acr.properties.loginServer}/parasail-ocr:latest'
       appSettings: concat(appSettings, [
         {
           name: 'APP_AZURE_STORAGE_CONNECTION_STRING'
           value: storageConnectionString
         }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_URL'
+          value: 'https://${acr.properties.loginServer}'
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_USERNAME'
+          value: acr.listCredentials().username
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_PASSWORD'
+          value: acr.listCredentials().passwords[0].value
+        }
       ])
-      appCommandLine: 'gunicorn -k uvicorn.workers.UvicornWorker wsgi:app --bind=0.0.0.0:8000'
       alwaysOn: true
       ftpsState: 'Disabled'
     }
