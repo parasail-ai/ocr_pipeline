@@ -274,47 +274,6 @@
         </div>
       </div>
 
-      <!-- Processing Status -->
-      <div style="margin: 2rem 0;">
-        <div class="status-panel">
-          <h2 class="card-title">Processing Status</h2>
-          <div id="status-list">
-            <div class="status-item processing" id="status-upload">
-              <span class="status-icon">⏳</span>
-              <div>
-                <div><strong>Upload</strong></div>
-                <div>Uploading to storage...</div>
-              </div>
-            </div>
-            <div class="status-item" id="status-ocr">
-              <span class="status-icon">⏳</span>
-              <div>
-                <div><strong>OCR Processing</strong></div>
-                <div>Extracting text from document...</div>
-              </div>
-            </div>
-            <div class="status-item" id="status-tables">
-              <span class="status-icon">⏳</span>
-              <div>
-                <div><strong>Table Extraction</strong></div>
-                <div>Finding tables and structured data...</div>
-              </div>
-            </div>
-            <div class="status-item" id="status-schema">
-              <span class="status-icon">⏳</span>
-              <div>
-                <div><strong>Schema Generation</strong></div>
-                <div>Analyzing document and generating schema...</div>
-              </div>
-            </div>
-          </div>
-
-          <div id="timing-info" style="margin-top: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 8px; display: none;">
-            <strong>Processing Time:</strong>
-            <div id="timing-details"></div>
-          </div>
-        </div>
-      </div>
 
       <!-- Auto-Generated Schema -->
       <div class="schema-panel" id="schema-panel" style="display: none;">
@@ -336,7 +295,7 @@
       </div>
     </div>
 
-    <script type="module">
+    <script>
       const documentId = "{{ document_id }}";
       let pollInterval;
       let document = null;
@@ -416,76 +375,6 @@
           ocrTextDisplay.style.color = "#999";
         }
 
-        // Update status items based on document.details.stage
-        const stage = document.details?.stage || "";
-        
-        // Upload status
-        if (document.blob_path) {
-          updateStatus("upload", "complete", "Upload Complete", `Stored in Azure: ${document.blob_path.split('/')[0]}...`);
-        } else {
-          updateStatus("upload", "processing", "Uploading", "Uploading to Microsoft storage...");
-        }
-
-        // OCR status
-        if (document.ocr_results && document.ocr_results.length > 0) {
-          const ocr = document.ocr_results[0];
-          const duration = ocr.duration_ms ? ` (${ocr.duration_ms}ms)` : "";
-          updateStatus("ocr", "complete", "OCR Complete", `Text extracted with ${ocr.model_name}${duration}`);
-        } else if (stage === "running_ocr" || document.status === "ocr_processing") {
-          updateStatus("ocr", "processing", "OCR Processing", `Sending to Parasail model (base64 encoded)...`);
-        } else if (stage === "downloading_from_blob" || document.status === "downloading") {
-          updateStatus("ocr", "processing", "Preparing OCR", "Downloading from Azure storage...");
-        } else if (stage === "downloaded") {
-          updateStatus("ocr", "processing", "OCR Starting", "Encoding document as base64...");
-        } else if (document.status === "processing" || document.status === "processed") {
-          updateStatus("ocr", "processing", "OCR Processing", "Extracting text...");
-        }
-
-        if (document.extractions && document.extractions.length > 0) {
-          const tableCount = document.extractions.filter(e => e.extraction_type === "table").length;
-          updateStatus("tables", "complete", "Table Extraction Complete", `Found ${tableCount} tables`);
-        } else if (document.status === "processed") {
-          updateStatus("tables", "complete", "Table Extraction Complete", "No tables found");
-        } else {
-          updateStatus("tables", "processing", "Table Extraction", "Analyzing document structure...");
-        }
-
-        if (document.schemas && document.schemas.length > 0) {
-          const schema = document.schemas[0];
-          const valueCount = Object.keys(schema.extracted_values || {}).length;
-          updateStatus("schema", "complete", "Schema Generated", `Extracted ${valueCount} fields`);
-        } else if (document.status === "processed") {
-          updateStatus("schema", "processing", "Generating Schema", "Analyzing document...");
-        }
-
-        // Show timing info if available
-        if (document.ocr_results && document.ocr_results.length > 0) {
-          const ocr = document.ocr_results[0];
-          if (ocr.duration_ms) {
-            const timingInfo = document.getElementById("timing-info");
-            const timingDetails = document.getElementById("timing-details");
-            timingInfo.style.display = "block";
-            timingDetails.innerHTML = `
-              <div>OCR Processing: ${ocr.duration_ms}ms</div>
-              <div>Model: ${ocr.model_name}</div>
-            `;
-          }
-        }
-      }
-
-      function updateStatus(id, status, title, message) {
-        const element = document.getElementById(`status-${id}`);
-        if (!element) return;
-
-        element.className = `status-item ${status}`;
-        const icon = status === "complete" ? "✅" : status === "error" ? "❌" : "⏳";
-        element.innerHTML = `
-          <span class="status-icon">${icon}</span>
-          <div>
-            <div><strong>${title}</strong></div>
-            <div>${message}</div>
-          </div>
-        `;
       }
 
       function showSchema() {
@@ -540,7 +429,7 @@
       }
 
       function showError() {
-        updateStatus("ocr", "error", "Processing Failed", "An error occurred during processing");
+        console.error("Document processing failed");
       }
 
       // Event handlers
