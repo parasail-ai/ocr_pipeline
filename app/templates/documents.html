@@ -813,10 +813,16 @@
             
             console.log('Filtering documents. isAdmin:', isAdmin, 'trashFolderId:', trashFolderId);
             
-            // Filter out trash documents for non-admin users
+            // ALWAYS filter out trash documents for non-admin users (regardless of folder)
             if (!isAdmin && trashFolderId) {
                 const beforeCount = filtered.length;
-                filtered = filtered.filter(doc => doc.folder_id !== trashFolderId);
+                filtered = filtered.filter(doc => {
+                    const docFolderId = doc.folder_id ? String(doc.folder_id) : null;
+                    const trashId = String(trashFolderId);
+                    const isInTrash = docFolderId === trashId;
+                    console.log('Doc:', doc.original_filename, 'folder_id:', docFolderId, 'trash?:', isInTrash);
+                    return !isInTrash;
+                });
                 console.log(`Filtered out ${beforeCount - filtered.length} trash documents`);
             }
             
