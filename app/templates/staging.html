@@ -864,10 +864,45 @@
         html += '<div style="margin-top: 1rem;">';
         Object.entries(values).forEach(([key, value]) => {
           const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          
+          // Format value based on type
+          let displayValue;
+          if (value === null || value === undefined || value === '') {
+            displayValue = '<em style="color: #999;">No value</em>';
+          } else if (typeof value === 'object') {
+            if (Array.isArray(value)) {
+              // Handle arrays
+              if (value.length === 0) {
+                displayValue = '<em style="color: #999;">Empty list</em>';
+              } else {
+                displayValue = '<ul style="margin: 0; padding-left: 1.5rem;">' + 
+                  value.map(item => `<li>${typeof item === 'object' ? JSON.stringify(item, null, 2) : item}</li>`).join('') + 
+                  '</ul>';
+              }
+            } else {
+              // Handle objects - show as formatted key-value pairs
+              const entries = Object.entries(value);
+              if (entries.length === 0) {
+                displayValue = '<em style="color: #999;">Empty object</em>';
+              } else {
+                displayValue = '<div style="margin-left: 1rem; border-left: 2px solid #e0e0e0; padding-left: 1rem;">' +
+                  entries.map(([k, v]) => `
+                    <div style="margin: 0.25rem 0;">
+                      <strong style="color: #666;">${k}:</strong> 
+                      <span>${typeof v === 'object' ? JSON.stringify(v) : v}</span>
+                    </div>
+                  `).join('') +
+                  '</div>';
+              }
+            }
+          } else {
+            displayValue = value;
+          }
+          
           html += `
             <div class="field-item">
               <div class="field-label">${displayKey}</div>
-              <div class="field-value">${value || '<em style="color: #999;">No value</em>'}</div>
+              <div class="field-value">${displayValue}</div>
             </div>
           `;
         });
