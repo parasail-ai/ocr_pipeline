@@ -676,6 +676,27 @@
             const icon = getDocumentIcon(doc.original_filename || doc.filename);
             const date = new Date(doc.uploaded_at || doc.created_at).toLocaleDateString();
             
+            // Get extracted values from schemas
+            let extractedInfo = '';
+            if (doc.schemas && doc.schemas.length > 0) {
+                const schema = doc.schemas[0]; // Get the first schema assignment
+                const values = schema.extracted_values || {};
+                const valueCount = Object.keys(values).length;
+                
+                if (valueCount > 0) {
+                    extractedInfo = `
+                        <div class="document-extracted" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0;">
+                            <div style="font-size: 12px; color: #666; margin-bottom: 4px;">
+                                <strong>📊 ${valueCount} fields extracted</strong>
+                            </div>
+                            <div style="font-size: 11px; color: #999; max-height: 40px; overflow: hidden;">
+                                ${Object.keys(values).slice(0, 3).map(key => escapeHtml(key)).join(', ')}${valueCount > 3 ? '...' : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
             return `
                 <div class="document-card" onclick="openDocument('${doc.id}')">
                     <div class="document-card-header">
@@ -685,7 +706,9 @@
                             <div class="document-meta">
                                 <div>Uploaded: ${date}</div>
                                 ${doc.file_size ? `<div>Size: ${formatFileSize(doc.file_size)}</div>` : ''}
+                                ${doc.detected_type ? `<div>Type: ${escapeHtml(doc.detected_type)}</div>` : ''}
                             </div>
+                            ${extractedInfo}
                         </div>
                     </div>
                     <div class="document-status">
