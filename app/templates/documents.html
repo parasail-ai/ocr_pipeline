@@ -76,6 +76,19 @@
             font-weight: 500;
         }
         
+        .folder-item.trash {
+            color: #d32f2f;
+        }
+        
+        .folder-item.trash:hover {
+            background: #ffebee;
+        }
+        
+        .folder-item.trash.active {
+            background: #ffcdd2;
+            color: #b71c1c;
+        }
+        
         .folder-icon {
             font-size: 18px;
         }
@@ -250,6 +263,26 @@
         
         .action-btn.delete:hover {
             background: #d32f2f;
+            color: white;
+        }
+        
+        .action-btn.restore {
+            color: #4caf50;
+            border-color: #4caf50;
+        }
+        
+        .action-btn.restore:hover {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .action-btn.permanent-delete {
+            color: #b71c1c;
+            border-color: #b71c1c;
+        }
+        
+        .action-btn.permanent-delete:hover {
+            background: #b71c1c;
             color: white;
         }
         
@@ -602,6 +635,7 @@
         let allDocuments = [];
         let currentFolderId = 'all';
         let currentView = 'grid';
+        let isTrashFolder = false;
 
         // Load documents on page load
         document.addEventListener('DOMContentLoaded', () => {
@@ -663,13 +697,17 @@
 
         function renderFolders(folders) {
             const folderTree = document.getElementById('folderTree');
-            const customFolders = folders.map(folder => `
-                <li class="folder-item" data-folder-id="${folder.id}">
-                    <span class="folder-icon">📁</span>
-                    <span class="folder-name">${escapeHtml(folder.name)}</span>
-                    <span class="folder-count">${folder.document_count || 0}</span>
-                </li>
-            `).join('');
+            const customFolders = folders.map(folder => {
+                const isTrash = folder.is_trash || false;
+                const trashClass = isTrash ? 'trash' : '';
+                return `
+                    <li class="folder-item ${trashClass}" data-folder-id="${folder.id}" data-is-trash="${isTrash}">
+                        <span class="folder-icon">${isTrash ? '🗑️' : '📁'}</span>
+                        <span class="folder-name">${escapeHtml(folder.name)}</span>
+                        <span class="folder-count">${folder.document_count || 0}</span>
+                    </li>
+                `;
+            }).join('');
             
             // Insert after the uncategorized folder
             folderTree.innerHTML = `
@@ -688,7 +726,7 @@
             
             // Add click handlers
             document.querySelectorAll('.folder-item').forEach(item => {
-                item.addEventListener('click', () => selectFolder(item.dataset.folderId));
+                item.addEventListener('click', () => selectFolder(item.dataset.folderId, item.dataset.isTrash === 'true'));
             });
         }
 
@@ -700,8 +738,9 @@
             document.getElementById('uncategorizedCount').textContent = uncategorizedCount;
         }
 
-        function selectFolder(folderId) {
+        function selectFolder(folderId, isTrash = false) {
             currentFolderId = folderId;
+            isTrashFolder = isTrash;
             
             // Update active state
             document.querySelectorAll('.folder-item').forEach(item => {
@@ -832,7 +871,12 @@
                         <span class="status-badge ${statusClass}">${statusText}</span>
                         <div class="document-actions">
                             <button class="action-btn" onclick="event.stopPropagation(); viewDocument('${doc.id}')">View</button>
-                            <button class="action-btn delete" onclick="event.stopPropagation(); deleteDocument('${doc.id}')">Delete</button>
+                            ${isTrashFolder ? `
+                                <button class="action-btn restore" onclick="event.stopPropagation(); restoreDocument('${doc.id}')">Restore</button>
+                                <button class="action-btn delete" onclick="event.stopPropagation(); permanentDeleteDocument('${doc.id}')">Permanent Delete</button>
+                            ` : `
+                                <button class="action-btn delete" onclick="event.stopPropagation(); deleteDocument('${doc.id}')">Delete</button>
+                            `}
                         </div>
                     </div>
                 </div>
@@ -881,7 +925,7 @@
         }
 
         async function deleteDocument(documentId) {
-            if (!confirm('Are you sure you want to delete this document?')) return;
+            if (!confirm('Move this document to trash?')) return;
             
             try {
                 const response = await fetch(`/api/documents/${documentId}`, {
@@ -890,13 +934,51 @@
                 
                 if (!response.ok) throw new Error('Failed to delete document');
                 
-                // Remove from local array
-                allDocuments = allDocuments.filter(doc => doc.id !== documentId);
-                updateFolderCounts();
-                renderDocuments();
+                // Reload documents to reflect trash move
+                await loadDocuments();
             } catch (error) {
                 console.error('Error deleting document:', error);
-                alert('Failed to delete document');
+                alert('Failed to move document to trash');
+            }
+        }
+        
+        async function restoreDocument(documentId) {
+            if (!confirm('Restore this document from trash?')) return;
+            
+            try {
+                const response = await fetch(`/api/documents/${documentId}/restore`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) throw new Error('Failed to restore document');
+                
+                // Reload documents
+                await loadDocuments();
+            } catch (error) {
+                console.error('Error restoring document:', error);
+                alert('Failed to restore document');
+            }
+        }
+        
+        async function permanentDeleteDocument(documentId) {
+            if (!confirm('⚠️ PERMANENTLY DELETE this document? This cannot be undone!')) return;
+            if (!confirm('Are you absolutely sure? This will delete the document and all its data forever.')) return;
+            
+            try {
+                const response = await fetch(`/api/documents/${documentId}/permanent`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.detail || 'Failed to permanently delete document');
+                }
+                
+                // Reload documents
+                await loadDocuments();
+            } catch (error) {
+                console.error('Error permanently deleting document:', error);
+                alert(error.message || 'Failed to permanently delete document');
             }
         }
 

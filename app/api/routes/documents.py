@@ -9,8 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies.auth import get_api_key_required
-from app.db.models import ApiProfile, Document, DocumentExtraction, DocumentMetrics, DocumentSchema, SchemaDefinition
+from app.db.models import ApiProfile, Document, DocumentExtraction, DocumentMetrics, DocumentSchema, SchemaDefinition, Folder
 from app.db.session import get_db
+from app.services.auth import AuthService
 from app.models.document import (
     DocumentApplySchemaRequest,
     DocumentBase64Upload,
@@ -412,16 +413,78 @@ async def delete_document(
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """
-    Delete a document and all its related data
+    Move a document to trash folder instead of permanently deleting
     
     This will:
-    - Delete the document record from the database
-    - Delete all related data (OCR results, contents, classifications, extractions, schema assignments)
-    - Delete the document from blob storage
+    - Move the document to the trash folder
+    - Keep all related data intact
     """
     document = await db.get(Document, document_id)
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    
+    # Get or create trash folder
+    result = await db.execute(
+        select(Folder).where(Folder.is_trash == True)
+    )
+    trash_folder = result.scalar_one_or_none()
+    
+    if not trash_folder:
+        trash_folder = Folder(
+            name="🗑️ Trash",
+            path="🗑️ Trash",
+            is_system=True,
+            is_trash=True
+        )
+        db.add(trash_folder)
+        await db.flush()
+    
+    # Move document to trash
+    document.folder_id = trash_folder.id
+    await db.commit()
+
+
+@router.delete("/{document_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+async def permanent_delete_document(
+    document_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    Permanently delete a document from the trash folder (admin only)
+    
+    This will:
+    - Verify user is admin
+    - Verify document is in trash folder
+    - Delete the document record from the database
+    - Delete all related data (OCR results, contents, classifications, extractions, schema assignments)
+    - Delete the document from blob storage
+    """
+    # Check admin permission
+    session_token = request.cookies.get("session_token")
+    if not AuthService.is_admin(session_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Only administrators can permanently delete documents"
+        )
+    
+    document = await db.get(Document, document_id)
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    
+    # Verify document is in trash folder
+    if document.folder_id:
+        folder = await db.get(Folder, document.folder_id)
+        if not folder or not folder.is_trash:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Document must be in trash folder to permanently delete"
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document must be in trash folder to permanently delete"
+        )
     
     blob_path = document.blob_path
     
@@ -437,6 +500,37 @@ async def delete_document(
         except Exception as e:
             # Log error but don't fail the request since DB record is already deleted
             logger.error("Failed to delete blob %s: %s", blob_path, str(e))
+
+
+@router.post("/{document_id}/restore", status_code=status.HTTP_204_NO_CONTENT)
+async def restore_document(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    Restore a document from trash to uncategorized
+    """
+    document = await db.get(Document, document_id)
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    
+    # Verify document is in trash
+    if document.folder_id:
+        folder = await db.get(Folder, document.folder_id)
+        if not folder or not folder.is_trash:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Document is not in trash folder"
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document is not in trash folder"
+        )
+    
+    # Move to uncategorized (set folder_id to None)
+    document.folder_id = None
+    await db.commit()
 
 
 @router.post("/base64", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)

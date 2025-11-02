@@ -1,16 +1,37 @@
 """API routes for folder management"""
 from uuid import UUID
-from typing import Any
+from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Folder, Document
 from app.db.session import get_db
+from app.services.auth import AuthService
 
 router = APIRouter(prefix="/folders", tags=["folders"])
+
+
+async def get_or_create_trash_folder(db: AsyncSession) -> Folder:
+    """Get or create the system trash folder."""
+    # Check if trash folder exists
+    stmt = select(Folder).where(Folder.is_trash == True)
+    trash_folder = await db.scalar(stmt)
+    
+    if not trash_folder:
+        # Create trash folder
+        trash_folder = Folder(
+            name="🗑️ Trash",
+            path="/Trash",
+            is_system=True,
+            is_trash=True,
+        )
+        db.add(trash_folder)
+        await db.flush()
+    
+    return trash_folder
 
 
 class FolderCreate(BaseModel):
@@ -29,6 +50,8 @@ class FolderResponse(BaseModel):
     parent_id: UUID | None
     path: str
     document_count: int
+    is_system: bool = False
+    is_trash: bool = False
     created_at: str
     updated_at: str
 
@@ -88,20 +111,53 @@ async def create_folder(
     )
 
 
+async def get_or_create_trash_folder(session: AsyncSession) -> Folder:
+    """Get or create the trash folder"""
+    result = await session.execute(
+        select(Folder).where(Folder.is_trash == True)
+    )
+    trash_folder = result.scalar_one_or_none()
+    
+    if not trash_folder:
+        trash_folder = Folder(
+            name="🗑️ Trash",
+            path="🗑️ Trash",
+            is_system=True,
+            is_trash=True
+        )
+        session.add(trash_folder)
+        await session.commit()
+        await session.refresh(trash_folder)
+    
+    return trash_folder
+
+
 @router.get("", response_model=FolderListResponse)
 async def list_folders(
+    request: Request,
     session: AsyncSession = Depends(get_db)
 ) -> Any:
-    """List all folders with document counts"""
+    """List all folders with document counts (trash folder only visible to admin)"""
+    
+    # Ensure trash folder exists
+    await get_or_create_trash_folder(session)
     
     result = await session.execute(
         select(Folder).order_by(Folder.path)
     )
     folders = result.scalars().all()
     
+    # Check if user is admin
+    session_token = request.cookies.get("session_token")
+    is_admin = AuthService.is_admin(session_token)
+    
     # Get document counts for all folders
     folder_responses = []
     for folder in folders:
+        # Filter out trash folder for non-admin users
+        if folder.is_trash and not is_admin:
+            continue
+            
         doc_count_result = await session.execute(
             select(func.count(Document.id)).where(Document.folder_id == folder.id)
         )
@@ -113,6 +169,8 @@ async def list_folders(
             parent_id=folder.parent_id,
             path=folder.path,
             document_count=doc_count,
+            is_system=folder.is_system,
+            is_trash=folder.is_trash,
             created_at=folder.created_at.isoformat(),
             updated_at=folder.updated_at.isoformat()
         ))
@@ -150,8 +208,36 @@ async def get_folder(
         parent_id=folder.parent_id,
         path=folder.path,
         document_count=doc_count,
+        is_system=folder.is_system,
+        is_trash=folder.is_trash,
         created_at=folder.created_at.isoformat(),
         updated_at=folder.updated_at.isoformat()
+    )
+
+
+@router.post("/init-trash", response_model=FolderResponse, status_code=201)
+async def init_trash_folder(
+    session: AsyncSession = Depends(get_db)
+) -> Any:
+    """Initialize trash folder if it doesn't exist"""
+    trash_folder = await get_or_create_trash_folder(session)
+    
+    # Count documents in folder
+    doc_count_result = await session.execute(
+        select(func.count(Document.id)).where(Document.folder_id == trash_folder.id)
+    )
+    doc_count = doc_count_result.scalar() or 0
+    
+    return FolderResponse(
+        id=trash_folder.id,
+        name=trash_folder.name,
+        parent_id=trash_folder.parent_id,
+        path=trash_folder.path,
+        document_count=doc_count,
+        is_system=trash_folder.is_system,
+        is_trash=trash_folder.is_trash,
+        created_at=trash_folder.created_at.isoformat(),
+        updated_at=trash_folder.updated_at.isoformat()
     )
 
 
