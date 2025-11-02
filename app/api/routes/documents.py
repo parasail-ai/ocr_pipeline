@@ -62,12 +62,20 @@ async def upload_document(
         selected_schema_id=schema_uuid,
         blob_path=blob_path,
         blob_url=blob_url,
+        status="processing",
         details={"content_type": file.content_type},
     )
     db.add(document)
     await db.commit()
     await db.refresh(document)
 
+    # Queue background processing
+    logger.info(
+        "Queuing background processing for document %s with model=%s, schema=%s",
+        document.id,
+        model_name,
+        schema_uuid
+    )
     background_tasks.add_task(
         process_document_task,
         document.id,

@@ -369,9 +369,6 @@
                         <label for="modelSelect">OCR Model</label>
                         <select id="modelSelect">
                             <option value="">Default (Docling only)</option>
-                            <option value="parasail-matt-ocr-2-deepseekocr">parasail-matt-ocr-2-deepseekocr</option>
-                            <option value="parasail-matt-ocr-1-dots">parasail-matt-ocr-1-dots</option>
-                            <option value="parasail-mattc-ocr-4-lighton">parasail-mattc-ocr-4-lighton</option>
                         </select>
                     </div>
                 </div>
@@ -456,6 +453,31 @@
                 });
             } catch (error) {
                 console.error('Error loading schemas:', error);
+            }
+        }
+
+        // Load OCR models
+        async function loadModels() {
+            try {
+                const response = await fetch('/api/models');
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                const models = data.items || [];
+                
+                // Filter only active models
+                const activeModels = models.filter(m => m.is_active);
+                
+                activeModels.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.name;
+                    // Show display name, provider, and masked API key
+                    option.textContent = `${model.display_name} (${model.provider}) - ${model.endpoint_url.substring(0, 40)}${model.endpoint_url.length > 40 ? '...' : ''} [Key: ${model.api_key_preview}]`;
+                    option.title = `Endpoint: ${model.endpoint_url}\nAPI Key: ${model.api_key_preview}`;
+                    elements.modelSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading models:', error);
             }
         }
 
@@ -609,6 +631,7 @@
 
         // Initialize
         loadSchemas();
+        loadModels();
     </script>
 </body>
 </html>

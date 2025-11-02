@@ -114,15 +114,12 @@ async def schemas_page(request: Request) -> HTMLResponse:
 
 @app.get("/models", response_class=HTMLResponse)
 async def models_page(request: Request) -> HTMLResponse:
-    """Models management page (coming soon)"""
+    """Models management page"""
     return templates.TemplateResponse(
-        "coming_soon.html",
+        "models.html",
         {
             "request": request,
-            "page_name": "models",
-            "page_title": "Model Management",
-            "icon": "🤖",
-            "description": "Configure and manage OCR models with custom endpoints and API keys. This feature is coming soon!",
+            "app_name": settings.app_name,
         },
     )
 

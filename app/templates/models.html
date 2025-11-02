@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Models - OCR Pipeline</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .models-hero {
+            text-align: center;
+            padding: 60px 20px 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .models-hero h1 {
+            font-size: 48px;
+            margin: 0 0 16px 0;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color), #2196f3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .models-hero p {
+            font-size: 18px;
+            color: #666;
+            margin: 0;
+        }
+        
+        .models-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px 60px;
+        }
+        
+        .models-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #673ab7;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5e35b1;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(103, 58, 183, 0.3);
+        }
+        
+        .models-grid {
+            display: grid;
+            gap: 24px;
+        }
+        
+        .model-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            transition: all 0.2s;
+        }
+        
+        .model-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        
+        .model-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 16px;
+        }
+        
+        .model-title {
+            flex: 1;
+        }
+        
+        .model-title h3 {
+            margin: 0 0 4px 0;
+            font-size: 20px;
+            color: #333;
+        }
+        
+        .model-name {
+            font-size: 14px;
+            color: #666;
+            font-family: monospace;
+        }
+        
+        .model-status {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .model-status.active {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .model-status.inactive {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .model-details {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .model-detail {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .model-detail-label {
+            font-weight: 500;
+            color: #666;
+            min-width: 100px;
+        }
+        
+        .model-detail-value {
+            color: #333;
+            flex: 1;
+        }
+        
+        .model-detail-value.monospace {
+            font-family: monospace;
+            font-size: 13px;
+        }
+        
+        .api-key-preview {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        
+        .model-actions {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #f0f0f0;
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .btn-danger {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .btn-danger:hover {
+            background: #ffcdd2;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        
+        .empty-state h3 {
+            margin: 0 0 8px 0;
+            font-size: 24px;
+            color: #333;
+        }
+        
+        .empty-state p {
+            margin: 0 0 24px 0;
+            color: #666;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="logo-icon">📄</span>
+                OCR Pipeline
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Upload</a>
+                <a href="/documents" class="nav-link">Documents</a>
+                <a href="/schemas" class="nav-link">Schemas</a>
+                <a href="/models" class="nav-link active">Models</a>
+                <a href="/analytics" class="nav-link">Analytics</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="models-hero">
+            <h1>🤖 OCR Models</h1>
+            <p>Configure and manage OCR models with custom endpoints and API keys</p>
+        </div>
+
+        <div class="models-container">
+            <div class="models-header">
+                <h2 style="margin: 0;">Available Models</h2>
+                <button class="btn btn-primary" onclick="alert('Model creation form coming soon!')">
+                    + Add Model
+                </button>
+            </div>
+
+            <div id="modelsContent">
+                <div class="loading">
+                    <p>Loading models...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadModels() {
+            try {
+                const response = await fetch('/api/models');
+                if (!response.ok) {
+                    throw new Error('Failed to load models');
+                }
+                
+                const data = await response.json();
+                const models = data.items || [];
+                
+                const container = document.getElementById('modelsContent');
+                
+                if (models.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🤖</div>
+                            <h3>No Models Yet</h3>
+                            <p>Get started by adding your first OCR model</p>
+                            <button class="btn btn-primary" onclick="alert('Model creation form coming soon!')">
+                                + Add Your First Model
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="models-grid">
+                        ${models.map(model => `
+                            <div class="model-card">
+                                <div class="model-header">
+                                    <div class="model-title">
+                                        <h3>${escapeHtml(model.display_name)}</h3>
+                                        <div class="model-name">${escapeHtml(model.name)}</div>
+                                    </div>
+                                    <span class="model-status ${model.is_active ? 'active' : 'inactive'}">
+                                        ${model.is_active ? 'Active' : 'Inactive'}
+                                    </span>
+                                </div>
+                                
+                                <div class="model-details">
+                                    <div class="model-detail">
+                                        <span class="model-detail-label">Provider:</span>
+                                        <span class="model-detail-value">${escapeHtml(model.provider)}</span>
+                                    </div>
+                                    
+                                    <div class="model-detail">
+                                        <span class="model-detail-label">Endpoint:</span>
+                                        <span class="model-detail-value monospace">${escapeHtml(model.endpoint_url)}</span>
+                                    </div>
+                                    
+                                    <div class="model-detail">
+                                        <span class="model-detail-label">API Key:</span>
+                                        <span class="api-key-preview">
+                                            🔒 ${escapeHtml(model.api_key_preview)}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div class="model-actions">
+                                    <button class="btn btn-secondary" onclick="editModel('${model.id}')">
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-danger" onclick="deleteModel('${model.id}', '${escapeHtml(model.display_name)}')">
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading models:', error);
+                document.getElementById('modelsContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <h3>Failed to Load Models</h3>
+                        <p>${error.message}</p>
+                        <button class="btn btn-primary" onclick="loadModels()">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function editModel(modelId) {
+            alert('Model editing form coming soon!');
+        }
+        
+        async function deleteModel(modelId, modelName) {
+            if (!confirm(`Are you sure you want to delete the model "${modelName}"?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/models/${modelId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to delete model');
+                }
+                
+                // Reload models
+                loadModels();
+            } catch (error) {
+                alert(`Failed to delete model: ${error.message}`);
+            }
+        }
+        
+        // Load models on page load
+        loadModels();
+    </script>
+</body>
+</html>

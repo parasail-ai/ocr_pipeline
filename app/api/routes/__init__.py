@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import auth, documents, schemas, folders
+from app.api.routes import auth, documents, schemas, folders, models
 
 
 def get_api_router() -> APIRouter:
@@ -9,4 +9,5 @@ def get_api_router() -> APIRouter:
     router.include_router(documents.router)
     router.include_router(schemas.router)
     router.include_router(folders.router)
+    router.include_router(models.router)
     return router
