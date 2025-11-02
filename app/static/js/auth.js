@@ -34,10 +34,15 @@ async function updateNavbar() {
     const existingAuthLinks = navMenu.querySelectorAll('[data-auth-link]');
     existingAuthLinks.forEach(link => link.remove());
     
-    // Hide/show Models link based on admin status
+    // Hide/show Models and Analytics links based on admin status
     const modelsLink = navMenu.querySelector('a[href="/models"]');
     if (modelsLink) {
         modelsLink.style.display = authStatus.is_admin ? '' : 'none';
+    }
+    
+    const analyticsLink = navMenu.querySelector('a[href="/analytics"]');
+    if (analyticsLink) {
+        analyticsLink.style.display = authStatus.is_admin ? '' : 'none';
     }
     
     // Add Login or Logout link
