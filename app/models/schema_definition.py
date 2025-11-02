@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 class SchemaField(BaseModel):
     key: str
-    query: str  # Query/prompt to extract this field from OCR text
+    query: str | None = None  # Query/prompt to extract this field from OCR text
     description: str | None = None
     value_type: str = "string"
     required: bool = False
