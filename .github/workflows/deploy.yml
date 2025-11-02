@@ -34,6 +34,8 @@ jobs:
           mkdir -p .python_packages/lib/site-packages
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt --target .python_packages/lib/site-packages
+          # Copy fix_path.pth to site-packages to fix /agents/python issue at Python startup
+          cp fix_path.pth .python_packages/lib/site-packages/
 
       - name: Archive build
         run: |
