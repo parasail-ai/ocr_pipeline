@@ -123,10 +123,11 @@ async def upload_document(
 
         # Queue background processing
         logger.info(
-            "Queuing background processing for document %s with model=%s, schema=%s",
+            "Queuing background processing for document %s with model=%s, schema=%s, preprocessing=%s",
             document.id,
             model_name,
-            schema_uuid
+            schema_uuid,
+            preprocessing
         )
         background_tasks.add_task(
             process_document_task,
@@ -135,6 +136,7 @@ async def upload_document(
             file.content_type,
             model_name,
             schema_uuid,
+            preprocessing,
         )
 
         # Return document with empty relationships since it was just created
@@ -240,12 +242,15 @@ async def get_document_extractions_json(
         "applied_schemas": [],
     }
     
-    # Add OCR text
+    # Add OCR text - prefer docstrange over parasail over docling
     if document.contents:
-        for content in document.contents:
-            if content.source == "parasail" or content.source == "docling":
-                output["ocr_text"] = content.text
-                break
+        docstrange_content = next((c for c in document.contents if c.source == "docstrange"), None)
+        parasail_content = next((c for c in document.contents if c.source == "parasail"), None)
+        docling_content = next((c for c in document.contents if c.source == "docling"), None)
+        
+        preferred_content = docstrange_content or parasail_content or docling_content
+        if preferred_content:
+            output["ocr_text"] = preferred_content.text
     
     # Add extractions
     for extraction in document.extractions:
@@ -631,6 +636,7 @@ async def upload_document_base64(
         payload.content_type,
         payload.model_name,
         schema_uuid,
+        "automatic",  # Default preprocessing for API uploads
     )
     
     return DocumentRead.model_validate(document)

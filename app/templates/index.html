@@ -414,10 +414,10 @@
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-icon">📎</div>
                     <p class="upload-text">Drop your document here or click to browse</p>
-                    <p class="upload-hint">Supports PDF, PNG, JPG, JPEG (Max 50MB)</p>
+                    <p class="upload-hint">Supports PDF, PNG, JPG, JPEG, DOCX, PPTX, XLSX, HTML, CSV (Max 50MB)</p>
                 </div>
                 
-                <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg" hidden>
+                <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.docx,.pptx,.xlsx,.html,.htm,.csv" hidden>
                 
                 <div class="file-info" id="fileInfo">
                     <div class="file-info-header">
@@ -449,6 +449,7 @@
                         <label for="preprocessingSelect">Pre-Processing</label>
                         <select id="preprocessingSelect">
                             <option value="automatic">Automatic</option>
+                            <option value="docstrange">DocStrange (PDF, DOCX, PPTX, XLSX, HTML, CSV)</option>
                         </select>
                     </div>
                 </div>
@@ -597,10 +598,25 @@
 
         // Handle file selection
         async function handleFileSelect(file) {
-            // Validate file type
-            const validTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
-            if (!validTypes.includes(file.type)) {
-                showStatus('Please select a PDF or image file (PNG, JPG, JPEG)', 'error');
+            // Validate file type - check both MIME type and extension
+            const validTypes = [
+                'application/pdf',
+                'image/png',
+                'image/jpeg',
+                'image/jpg',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'text/html',
+                'text/csv'
+            ];
+            const validExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.docx', '.pptx', '.xlsx', '.html', '.htm', '.csv'];
+            const fileName = file.name.toLowerCase();
+            const hasValidType = validTypes.includes(file.type);
+            const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+            
+            if (!hasValidType && !hasValidExtension) {
+                showStatus('Please select a supported file type (PDF, PNG, JPG, JPEG, DOCX, PPTX, XLSX, HTML, CSV)', 'error');
                 return;
             }
 
@@ -608,6 +624,14 @@
             if (file.size > 50 * 1024 * 1024) {
                 showStatus('File size must be less than 50MB', 'error');
                 return;
+            }
+            
+            // Auto-select DocStrange for office documents
+            const officeExtensions = ['.docx', '.pptx', '.xlsx', '.html', '.htm', '.csv'];
+            if (officeExtensions.some(ext => fileName.endsWith(ext))) {
+                elements.preprocessingSelect.value = 'docstrange';
+                showStatus('DocStrange preprocessing auto-selected for office document', 'info');
+                setTimeout(() => hideStatus(), 3000);
             }
             
             // Validate PDF page count (max 5 pages)

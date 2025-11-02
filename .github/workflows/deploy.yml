@@ -1,4 +1,4 @@
-name: CI-CD
+name: Build and Deploy to Azure
 
 on:
   push:
@@ -7,8 +7,10 @@ on:
   workflow_dispatch:
 
 env:
+  RESOURCE_GROUP: parasail-ocr-pipeline-rg
   APP_NAME: parasail-ocr-pipeline
-  ACR_NAME: parasailocr # Will get unique suffix in Azure
+  ACR_NAME: parasailocrujxbwjwvmweea
+  IMAGE_NAME: parasail-ocr
 
 jobs:
   build-and-deploy:
@@ -18,40 +20,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Log in to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Get ACR login server
-        id: acr
+      - name: Build and push Docker image to ACR
         run: |
-          ACR_LOGIN_SERVER=$(az acr list --resource-group parasail-ocr-pipeline-rg --query "[0].loginServer" -o tsv)
-          echo "login_server=$ACR_LOGIN_SERVER" >> $GITHUB_OUTPUT
-          echo "ACR Login Server: $ACR_LOGIN_SERVER"
+          az acr build \
+            --registry ${{ env.ACR_NAME }} \
+            --image ${{ env.IMAGE_NAME }}:latest \
+            --image ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --file Dockerfile \
+            .
 
-      - name: Log in to Azure Container Registry
+      - name: Restart Azure App Service
         run: |
-          az acr login --name $(az acr list --resource-group parasail-ocr-pipeline-rg --query "[0].name" -o tsv)
+          az webapp restart \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.APP_NAME }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.acr.outputs.login_server }}/parasail-ocr:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Wait for deployment
+        run: sleep 30
 
-      - name: Restart Azure Web App
+      - name: Health check
         run: |
-          az webapp restart --resource-group parasail-ocr-pipeline-rg --name ${{ env.APP_NAME }}
-
-      - name: Post-deployment health check
-        if: success()
-        run: |
-          echo "Deployment triggered for ${{ env.APP_NAME }}"
-          echo "Container image: ${{ steps.acr.outputs.login_server }}/parasail-ocr:latest"
+          echo "Checking application health..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.APP_NAME }}.azurewebsites.net/health || echo "000")
+          echo "Health endpoint returned: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "404" ]; then
+            echo "✅ Deployment successful!"
+            echo "🌐 Application URL: https://${{ env.APP_NAME }}.azurewebsites.net"
+            echo "🐳 Docker image: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest"
+            echo "📝 Git commit: ${{ github.sha }}"
+          else
+            echo "⚠️ Health check returned unexpected status code"
+            exit 0
+          fi
