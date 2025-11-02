@@ -836,8 +836,9 @@
           }
         }
         
-        // Show save button if we have extracted values and no saved schema
-        if (Object.keys(values).length > 0 && !schemaInfo) {
+        // Show save button if we have extracted values and it's not a user-saved schema
+        const isAdHocSchema = schemaInfo && schemaInfo.name === '__ad_hoc_auto_generated__';
+        if (Object.keys(values).length > 0 && (!schemaInfo || isAdHocSchema)) {
           saveSchemaBtn.style.display = 'block';
         } else {
           saveSchemaBtn.style.display = 'none';
@@ -853,7 +854,7 @@
         }
 
         let html = '';
-        if (schemaInfo) {
+        if (schemaInfo && schemaInfo.name !== '__ad_hoc_auto_generated__') {
           html += `<div style="margin-bottom: 1.5rem; padding: 1rem; background: #e3f2fd; border-radius: 8px;">
             <h3 style="margin: 0 0 0.5rem 0; color: #1976d2;">Schema: ${schemaInfo.name}</h3>
             <p style="margin: 0; color: #666; font-size: 14px;">${schemaInfo.description || 'Auto-generated schema'}</p>

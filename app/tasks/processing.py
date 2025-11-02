@@ -537,12 +537,36 @@ async def _auto_generate_schema(
                 len(extracted_values)
             )
             
-            # Create DocumentSchema directly WITHOUT saving to schema_definitions
-            # This attaches the schema data to this document only, not as a reusable template
+            # Create or get the ad-hoc schema template
+            # This is a special internal schema that marks auto-generated (non-saved) schemas
+            AD_HOC_SCHEMA_NAME = "__ad_hoc_auto_generated__"
+            
+            stmt = select(SchemaDefinition).where(
+                SchemaDefinition.name == AD_HOC_SCHEMA_NAME
+            )
+            ad_hoc_schema = await session.scalar(stmt)
+            
+            if not ad_hoc_schema:
+                # Create the ad-hoc schema placeholder
+                ad_hoc_schema = SchemaDefinition(
+                    name=AD_HOC_SCHEMA_NAME,
+                    category="system",
+                    description="Internal placeholder for auto-generated schemas (not user-visible)",
+                    fields=fields,
+                    is_template=False,
+                )
+                session.add(ad_hoc_schema)
+                await session.flush()
+                logger.info("Created ad-hoc schema placeholder")
+            else:
+                # Update fields if needed
+                ad_hoc_schema.fields = fields
+            
+            # Apply schema to document with extracted values
             if extracted_values:
                 assignment = DocumentSchema(
                     document_id=document_id,
-                    schema_id=None,  # No reusable schema template
+                    schema_id=ad_hoc_schema.id,
                     extracted_values=extracted_values
                 )
                 session.add(assignment)

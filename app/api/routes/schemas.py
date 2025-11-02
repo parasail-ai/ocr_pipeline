@@ -53,6 +53,10 @@ async def create_schema(payload: SchemaCreate, db: AsyncSession = Depends(get_db
 @router.get("", response_model=SchemaList)
 async def list_schemas(category: str | None = None, db: AsyncSession = Depends(get_db)) -> SchemaList:
     stmt = select(SchemaDefinition).order_by(SchemaDefinition.created_at.desc())
+    
+    # Filter out internal ad-hoc schema placeholder
+    stmt = stmt.where(SchemaDefinition.name != "__ad_hoc_auto_generated__")
+    
     if category:
         stmt = stmt.where(SchemaDefinition.category == category)
 
