@@ -3,17 +3,22 @@
 
 echo "=== Custom Startup Script ==="
 echo "Original PYTHONPATH: $PYTHONPATH"
+echo "Working directory: $(pwd)"
 
 # Copy sitecustomize.py to site-packages so it runs automatically
 SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
 echo "Site-packages location: $SITE_PACKAGES"
 
-if [ -f "/tmp/8de19ecaa12a552/sitecustomize.py" ]; then
-    echo "Copying sitecustomize.py to site-packages..."
-    cp /tmp/8de19ecaa12a552/sitecustomize.py "$SITE_PACKAGES/" 2>/dev/null || true
+# Find sitecustomize.py in the current deployment directory
+if [ -f "sitecustomize.py" ]; then
+    echo "Copying sitecustomize.py from $(pwd)/sitecustomize.py to site-packages..."
+    cp sitecustomize.py "$SITE_PACKAGES/" 2>/dev/null || true
+    echo "Copy result: $?"
+else
+    echo "WARNING: sitecustomize.py not found in $(pwd)"
 fi
 
-# Alternative: Fix PYTHONPATH directly by removing /agents/python
+# Fix PYTHONPATH directly by removing /agents/python
 export PYTHONPATH=$(echo "$PYTHONPATH" | tr ':' '\n' | grep -v '/agents/python' | tr '\n' ':' | sed 's/:$//')
 echo "Fixed PYTHONPATH: $PYTHONPATH"
 
