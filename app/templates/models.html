@@ -213,6 +213,130 @@
             padding: 60px 20px;
             color: #666;
         }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s;
+        }
+        
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            font-size: 24px;
+            color: #333;
+        }
+        
+        .modal-close {
+            font-size: 28px;
+            color: #999;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+        
+        .modal-close:hover {
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #673ab7;
+            box-shadow: 0 0 0 3px rgba(103, 58, 183, 0.1);
+        }
+        
+        .form-hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 32px;
+        }
+        
+        .modal-actions .btn {
+            flex: 1;
+        }
     </style>
 </head>
 <body>
@@ -241,7 +365,7 @@
         <div class="models-container">
             <div class="models-header">
                 <h2 style="margin: 0;">Available Models</h2>
-                <button class="btn btn-primary" onclick="alert('Model creation form coming soon!')">
+                <button class="btn btn-primary" onclick="openAddModelModal()">
                     + Add Model
                 </button>
             </div>
@@ -251,6 +375,67 @@
                     <p>Loading models...</p>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Add Model Modal -->
+    <div id="addModelModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New OCR Model</h2>
+                <button class="modal-close" onclick="closeAddModelModal()">×</button>
+            </div>
+            
+            <form id="addModelForm" onsubmit="submitAddModel(event)">
+                <div class="form-group">
+                    <label for="modelName">Model Name *</label>
+                    <input type="text" id="modelName" required placeholder="e.g., parasail-matt-ocr-1-dots">
+                    <div class="form-hint">Internal identifier for the model</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="displayName">Display Name *</label>
+                    <input type="text" id="displayName" required placeholder="e.g., Parasail OCR v1">
+                    <div class="form-hint">User-friendly name shown in the UI</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="provider">Provider *</label>
+                    <select id="provider" required>
+                        <option value="parasail">Parasail</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="endpointUrl">Endpoint URL *</label>
+                    <input type="url" id="endpointUrl" required placeholder="https://api.parasail.io/v1" value="https://api.parasail.io/v1">
+                    <div class="form-hint">Base URL for the API (OpenAI-compatible)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="apiKey">API Key *</label>
+                    <input type="password" id="apiKey" required placeholder="psk-...">
+                    <div class="form-hint">Your API key (will be stored securely)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="isActive" checked style="width: auto; margin-right: 8px;">
+                        <span>Active (available for use)</span>
+                    </label>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddModelModal()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        Add Model
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -273,7 +458,7 @@
                             <div class="empty-state-icon">🤖</div>
                             <h3>No Models Yet</h3>
                             <p>Get started by adding your first OCR model</p>
-                            <button class="btn btn-primary" onclick="alert('Model creation form coming soon!')">
+                            <button class="btn btn-primary" onclick="openAddModelModal()">
                                 + Add Your First Model
                             </button>
                         </div>
@@ -369,6 +554,69 @@
                 loadModels();
             } catch (error) {
                 alert(`Failed to delete model: ${error.message}`);
+            }
+        }
+        
+        // Modal functions
+        function openAddModelModal() {
+            document.getElementById('addModelModal').classList.add('show');
+            document.getElementById('addModelForm').reset();
+            // Set default endpoint
+            document.getElementById('endpointUrl').value = 'https://api.parasail.io/v1';
+        }
+        
+        function closeAddModelModal() {
+            document.getElementById('addModelModal').classList.remove('show');
+        }
+        
+        // Close modal when clicking outside
+        document.getElementById('addModelModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAddModelModal();
+            }
+        });
+        
+        async function submitAddModel(event) {
+            event.preventDefault();
+            
+            const formData = {
+                name: document.getElementById('modelName').value,
+                display_name: document.getElementById('displayName').value,
+                provider: document.getElementById('provider').value,
+                endpoint_url: document.getElementById('endpointUrl').value,
+                api_key: document.getElementById('apiKey').value,
+                config: {},
+                is_active: document.getElementById('isActive').checked
+            };
+            
+            try {
+                const submitBtn = event.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Adding...';
+                
+                const response = await fetch('/api/models', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to add model');
+                }
+                
+                closeAddModelModal();
+                loadModels();
+                alert('Model added successfully!');
+            } catch (error) {
+                console.error('Error adding model:', error);
+                alert(`Failed to add model: ${error.message}`);
+            } finally {
+                const submitBtn = event.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add Model';
             }
         }
         
