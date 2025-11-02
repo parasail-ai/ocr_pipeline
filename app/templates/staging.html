@@ -208,6 +208,22 @@
       <div class="staging-header">
         <h1 class="headline">Processing Document</h1>
         <p id="document-name"></p>
+        
+        <!-- Processing Progress -->
+        <div id="processing-status" style="margin-top: 1rem; display: none;">
+          <div style="background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+              <div>
+                <h3 style="margin: 0 0 0.5rem 0; font-size: 16px; color: #333;">Processing...</h3>
+                <p id="status-text" style="margin: 0; color: #666; font-size: 14px;">Uploading document...</p>
+              </div>
+              <div id="elapsed-time" style="font-size: 14px; color: #666;"></div>
+            </div>
+            <div style="background: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden;">
+              <div id="progress-bar" style="background: linear-gradient(90deg, #1976d2, #42a5f5); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Tab Navigation -->
@@ -299,6 +315,40 @@
       const documentId = "{{ document_id }}";
       let pollInterval;
       let document = null;
+      let startTime = Date.now();
+      let timeInterval;
+
+      // Tab switching function - MUST be defined first
+      function switchTab(tabName) {
+        console.log("Switching to tab:", tabName);
+        
+        // Update tab buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          btn.classList.remove('active');
+          if (btn.getAttribute('data-tab') === tabName) {
+            btn.classList.add('active');
+          }
+        });
+
+        // Update tab contents
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.classList.remove('active');
+          content.style.display = 'none';
+        });
+
+        const activeTab = document.getElementById(`tab-${tabName}`);
+        if (activeTab) {
+          activeTab.classList.add('active');
+          activeTab.style.display = 'block';
+        }
+
+        // Update content when switching to tabs
+        if (tabName === 'fields') {
+          updateExtractedFieldsTab();
+        } else if (tabName === 'json') {
+          updateJSONTab();
+        }
+      }
 
       async function loadDocument() {
         try {
@@ -307,14 +357,19 @@
           
           document = await response.json();
           updateUI();
+          updateProgress();
           
           // Check if processing is complete
           if (document.status === "processed") {
             clearInterval(pollInterval);
+            clearInterval(timeInterval);
             showSchema();
+            hideProgress();
           } else if (document.status === "error") {
             clearInterval(pollInterval);
+            clearInterval(timeInterval);
             showError();
+            hideProgress();
           }
         } catch (error) {
           console.error("Error loading document:", error);
@@ -433,6 +488,75 @@
         console.error("Document processing failed");
       }
 
+      function updateProgress() {
+        if (!document) return;
+        
+        const statusDiv = document.getElementById('processing-status');
+        const statusText = document.getElementById('status-text');
+        const progressBar = document.getElementById('progress-bar');
+        
+        if (document.status === 'processed') {
+          statusDiv.style.display = 'none';
+          return;
+        }
+        
+        statusDiv.style.display = 'block';
+        
+        // Determine status and progress based on document state
+        let progress = 10;
+        let message = 'Initializing...';
+        
+        if (document.status === 'uploaded') {
+          progress = 20;
+          message = 'Document uploaded, queued for processing...';
+        } else if (document.status === 'processing') {
+          // Check what's been completed
+          const hasContents = document.contents && document.contents.length > 0;
+          const hasExtractions = document.extractions && document.extractions.length > 0;
+          const hasClassifications = document.classifications && document.classifications.length > 0;
+          const hasSchemas = document.schemas && document.schemas.length > 0;
+          
+          if (!hasContents) {
+            progress = 30;
+            message = 'Running OCR extraction...';
+          } else if (!hasExtractions) {
+            progress = 50;
+            message = 'Extracting tables and data...';
+          } else if (!hasClassifications) {
+            progress = 70;
+            message = 'Classifying document...';
+          } else if (!hasSchemas) {
+            progress = 85;
+            message = 'Generating schema...';
+          } else {
+            progress = 95;
+            message = 'Finalizing...';
+          }
+        }
+        
+        progressBar.style.width = progress + '%';
+        statusText.textContent = message;
+      }
+
+      function hideProgress() {
+        const statusDiv = document.getElementById('processing-status');
+        statusDiv.style.display = 'none';
+      }
+
+      function updateElapsedTime() {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        const timeText = minutes > 0 
+          ? `${minutes}m ${seconds}s` 
+          : `${seconds}s`;
+        
+        const elapsedDiv = document.getElementById('elapsed-time');
+        if (elapsedDiv) {
+          elapsedDiv.textContent = `Elapsed: ${timeText}`;
+        }
+      }
+
       // Event handlers
       document.getElementById("save-document").addEventListener("click", async () => {
         // Collect edited values
@@ -486,36 +610,6 @@
           }
         }
       });
-
-      // Tab switching - defined early so event listeners can reference it
-      function switchTab(tabName) {
-        // Update tab buttons
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-          btn.classList.remove('active');
-          if (btn.getAttribute('data-tab') === tabName) {
-            btn.classList.add('active');
-          }
-        });
-
-        // Update tab contents
-        document.querySelectorAll('.tab-content').forEach(content => {
-          content.classList.remove('active');
-          content.style.display = 'none';
-        });
-
-        const activeTab = document.getElementById(`tab-${tabName}`);
-        if (activeTab) {
-          activeTab.classList.add('active');
-          activeTab.style.display = 'block';
-        }
-
-        // Update content when switching to tabs
-        if (tabName === 'fields') {
-          updateExtractedFieldsTab();
-        } else if (tabName === 'json') {
-          updateJSONTab();
-        }
-      }
 
       function updateExtractedFieldsTab() {
         const fieldsDisplay = document.getElementById('extracted-fields-display');
@@ -668,13 +762,15 @@
         });
       });
 
-      // Start polling
+      // Initialize - Start polling and time tracking
       loadDocument();
       pollInterval = setInterval(loadDocument, 2000); // Poll every 2 seconds
+      timeInterval = setInterval(updateElapsedTime, 1000); // Update time every second
 
       // Cleanup on page unload
       window.addEventListener("beforeunload", () => {
         if (pollInterval) clearInterval(pollInterval);
+        if (timeInterval) clearInterval(timeInterval);
       });
     </script>
   </body>
