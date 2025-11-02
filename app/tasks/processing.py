@@ -25,6 +25,7 @@ from app.services.blob_storage import BlobStorageService
 from app.services.classifier import DocumentClassifier
 from app.services.docling import DoclingProcessor, DoclingUnavailable
 from app.services.parasail import ParasailOCRClient
+from app.services.pdf_splitter import PDFSplitterService
 from app.services.schema_generator import SchemaGenerator
 from app.services.table_extractor import TableExtractor
 
@@ -91,19 +92,61 @@ async def process_document_task(
             )
             
             logger.info(f"Starting Parasail OCR with model: {model_name}")
-            logger.info(f"Encoding {len(file_bytes)} bytes as base64")
             
             client = ParasailOCRClient()
-            parasail_response = await asyncio.to_thread(
-                client.extract_document,
-                content=file_bytes,
-                filename=Path(blob_path).name,
-                mime_type=content_type,
-                model=model_name,
-            )
+            
+            # Check if this is a multi-page PDF
+            pdf_splitter = PDFSplitterService()
+            if pdf_splitter.is_pdf(file_bytes):
+                page_count = await asyncio.to_thread(pdf_splitter.get_page_count, file_bytes)
+                logger.info(f"Detected PDF with {page_count} pages")
+                
+                if page_count > 1:
+                    # Split PDF into individual page images
+                    logger.info(f"Splitting PDF into {page_count} page images...")
+                    page_images = await asyncio.to_thread(
+                        pdf_splitter.split_pdf_to_images,
+                        file_bytes,
+                        dpi=200  # Good quality for OCR
+                    )
+                    logger.info(f"Split {len(page_images)} pages successfully")
+                    
+                    # Process all pages
+                    parasail_response = await asyncio.to_thread(
+                        client.extract_multi_page,
+                        page_images=page_images,
+                        filename=Path(blob_path).name,
+                        model=model_name,
+                    )
+                    logger.info(f"Parasail multi-page OCR completed for {page_count} pages")
+                    
+                    # Extract combined text from multi-page response
+                    parasail_text = parasail_response.get("combined_text", "")
+                else:
+                    # Single page PDF - process normally
+                    logger.info(f"Processing single-page PDF")
+                    parasail_response = await asyncio.to_thread(
+                        client.extract_document,
+                        content=file_bytes,
+                        filename=Path(blob_path).name,
+                        mime_type=content_type,
+                        model=model_name,
+                    )
+                    parasail_text = _extract_text_from_parasail_response(parasail_response)
+            else:
+                # Not a PDF - process as single image/document
+                logger.info(f"Processing non-PDF document ({content_type})")
+                parasail_response = await asyncio.to_thread(
+                    client.extract_document,
+                    content=file_bytes,
+                    filename=Path(blob_path).name,
+                    mime_type=content_type,
+                    model=model_name,
+                )
+                parasail_text = _extract_text_from_parasail_response(parasail_response)
+            
             logger.info(f"Parasail OCR completed for document {document_id}")
             
-            parasail_text = _extract_text_from_parasail_response(parasail_response)
             if parasail_text:
                 logger.info(f"Extracted {len(parasail_text)} characters of text from Parasail response")
             else:
