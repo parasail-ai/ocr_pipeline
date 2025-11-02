@@ -526,10 +526,33 @@
                 
                 updateFolderCounts();
                 renderDocuments();
+                
+                // Check if any documents are still processing
+                const hasProcessing = allDocuments.some(doc => {
+                    const status = getDocumentStatus(doc);
+                    return status === 'processing';
+                });
+                
+                // Auto-refresh if there are processing documents
+                if (hasProcessing) {
+                    scheduleRefresh();
+                }
             } catch (error) {
                 console.error('Error loading documents:', error);
                 showError('Failed to load documents');
             }
+        }
+        
+        let refreshTimeout = null;
+        function scheduleRefresh() {
+            // Clear any existing timeout
+            if (refreshTimeout) {
+                clearTimeout(refreshTimeout);
+            }
+            // Refresh after 3 seconds
+            refreshTimeout = setTimeout(() => {
+                loadDocuments();
+            }, 3000);
         }
 
         async function loadFolders() {
@@ -723,8 +746,14 @@
         }
 
         function getDocumentStatus(doc) {
-            if (doc.status === 'completed') return 'completed';
-            if (doc.status === 'failed') return 'failed';
+            // Map backend status values to display status
+            if (doc.status === 'processed') return 'completed';
+            if (doc.status === 'error' || doc.status === 'ocr_failed') return 'failed';
+            if (doc.status === 'uploaded' || doc.status === 'downloading' || 
+                doc.status === 'downloaded' || doc.status === 'ocr_processing') {
+                return 'processing';
+            }
+            // Default to processing for any unknown status
             return 'processing';
         }
 
