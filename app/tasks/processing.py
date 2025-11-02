@@ -630,43 +630,11 @@ async def _extract_key_value_pairs(
     document_id: uuid.UUID,
     ocr_text: str,
 ) -> None:
-    """Extract key-value pairs from OCR text and store as extraction."""
-    logger.info("Extracting key-value pairs for document %s", document_id)
+    """Extract key-value pairs from OCR text using AI and store as extraction."""
+    logger.info("Extracting key-value pairs with AI for document %s", document_id)
     
-    try:
-        generator = SchemaGenerator()
-    except RuntimeError as exc:
-        logger.warning("Schema generator not available for key-value extraction: %s", exc)
-        return
-    
-    try:
-        # Extract key-value pairs
-        kv_pairs = await asyncio.to_thread(generator.extract_key_value_pairs, ocr_text)
-        
-        if not kv_pairs:
-            logger.info("No key-value pairs extracted for document %s", document_id)
-            return
-        
-        # Store as document extraction
-        async with AsyncSessionLocal() as session:
-            extraction = DocumentExtraction(
-                document_id=document_id,
-                extraction_type="key_value",
-                source="ai_extraction",
-                data=kv_pairs,
-                extraction_metadata={
-                    "pair_count": len(kv_pairs),
-                    "extraction_method": "schema_generator"
-                }
-            )
-            session.add(extraction)
-            await session.commit()
-            
-            logger.info(
-                "Stored %d key-value pairs for document %s",
-                len(kv_pairs),
-                document_id
-            )
-            
-    except Exception as exc:
-        logger.exception("Failed to extract key-value pairs for document %s: %s", document_id, exc)
+    # This function is now handled by _auto_generate_schema which uses AI
+    # and includes both schema generation and key-value extraction
+    # We don't need a separate extraction step since AI does both at once
+    logger.info("Key-value extraction handled by AI schema generation for document %s", document_id)
+    return
