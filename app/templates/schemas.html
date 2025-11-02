@@ -172,7 +172,8 @@
 
         <div id="alert" class="alert"></div>
 
-        <!-- AI Schema Generator Configuration -->
+        <!-- AI Schema Generator Configuration (Admin Only) -->
+        {% if is_admin %}
         <div class="config-section">
             <div class="config-header">
                 <div>
@@ -229,6 +230,7 @@
                 </div>
             </form>
         </div>
+        {% endif %}
 
         <!-- Schemas List -->
         <div class="schemas-list">

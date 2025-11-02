@@ -1,159 +1,107 @@
-"""Authentication and API key management routes"""
-import uuid
+import logging
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Cookie, HTTPException, Response, status
+from pydantic import BaseModel, EmailStr
 
-from app.db.models import ApiKey, ApiProfile
-from app.db.session import get_db
-from app.models.auth import (
-    ApiKeyCreate,
-    ApiKeyCreated,
-    ApiKeyList,
-    ApiKeyRead,
-    ApiProfileCreate,
-    ApiProfileList,
-    ApiProfileRead,
-)
 from app.services.auth import AuthService
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@router.post("/profiles", response_model=ApiProfileRead, status_code=status.HTTP_201_CREATED)
-async def create_profile(
-    payload: ApiProfileCreate,
-    db: AsyncSession = Depends(get_db)
-) -> ApiProfileRead:
-    """Create a new API profile"""
-    # Check if email already exists
-    stmt = select(ApiProfile).where(ApiProfile.email == payload.email)
-    existing = await db.scalar(stmt)
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class LoginResponse(BaseModel):
+    success: bool
+    message: str
+    is_admin: bool
+
+
+class SessionResponse(BaseModel):
+    is_authenticated: bool
+    is_admin: bool
+    email: Optional[str] = None
+
+
+@router.post("/login", response_model=LoginResponse)
+async def login(
+    credentials: LoginRequest,
+    response: Response
+) -> LoginResponse:
+    """Admin login endpoint."""
     
-    if existing:
+    # Verify credentials
+    if not AuthService.verify_credentials(credentials.email, credentials.password):
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Profile with this email already exists"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
         )
     
-    profile = await AuthService.create_profile(
-        name=payload.name,
-        email=payload.email,
-        db=db
+    # Create session
+    session_token = AuthService.create_session(credentials.email)
+    
+    # Set session cookie (httponly for security)
+    response.set_cookie(
+        key="session_token",
+        value=session_token,
+        httponly=True,
+        max_age=86400 * 7,  # 7 days
+        samesite="lax"
     )
     
-    return ApiProfileRead.model_validate(profile)
-
-
-@router.get("/profiles", response_model=ApiProfileList)
-async def list_profiles(
-    db: AsyncSession = Depends(get_db)
-) -> ApiProfileList:
-    """List all API profiles"""
-    stmt = select(ApiProfile).order_by(ApiProfile.created_at.desc())
-    result = await db.execute(stmt)
-    profiles = list(result.scalars().all())
+    logger.info(f"Admin login successful: {credentials.email}")
     
-    return ApiProfileList(
-        items=[ApiProfileRead.model_validate(p) for p in profiles]
-    )
-
-
-@router.get("/profiles/{profile_id}", response_model=ApiProfileRead)
-async def get_profile(
-    profile_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db)
-) -> ApiProfileRead:
-    """Get a specific API profile"""
-    profile = await db.get(ApiProfile, profile_id)
-    
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Profile not found"
-        )
-    
-    return ApiProfileRead.model_validate(profile)
-
-
-@router.post("/profiles/{profile_id}/keys", response_model=ApiKeyCreated, status_code=status.HTTP_201_CREATED)
-async def create_api_key(
-    profile_id: uuid.UUID,
-    payload: ApiKeyCreate,
-    db: AsyncSession = Depends(get_db)
-) -> ApiKeyCreated:
-    """Create a new API key for a profile"""
-    # Verify profile exists
-    profile = await db.get(ApiProfile, profile_id)
-    
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Profile not found"
-        )
-    
-    if not profile.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot create API key for inactive profile"
-        )
-    
-    # Create the API key
-    key, api_key = await AuthService.create_api_key(
-        profile_id=str(profile_id),
-        name=payload.name,
-        db=db,
-        expires_at=payload.expires_at
-    )
-    
-    return ApiKeyCreated(
-        key=key,
-        key_info=ApiKeyRead.model_validate(api_key)
+    return LoginResponse(
+        success=True,
+        message="Login successful",
+        is_admin=True
     )
 
 
-@router.get("/profiles/{profile_id}/keys", response_model=ApiKeyList)
-async def list_profile_keys(
-    profile_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db)
-) -> ApiKeyList:
-    """List all API keys for a profile"""
-    # Verify profile exists
-    profile = await db.get(ApiProfile, profile_id)
+@router.post("/logout")
+async def logout(
+    response: Response,
+    session_token: Optional[str] = Cookie(None)
+) -> dict:
+    """Logout endpoint."""
     
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Profile not found"
-        )
+    if session_token:
+        AuthService.delete_session(session_token)
     
-    stmt = (
-        select(ApiKey)
-        .where(ApiKey.profile_id == profile_id)
-        .order_by(ApiKey.created_at.desc())
-    )
-    result = await db.execute(stmt)
-    keys = list(result.scalars().all())
+    # Clear session cookie
+    response.delete_cookie(key="session_token")
     
-    return ApiKeyList(
-        items=[ApiKeyRead.model_validate(k) for k in keys]
-    )
+    return {"success": True, "message": "Logged out successfully"}
 
 
-@router.delete("/keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def revoke_api_key(
-    key_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db)
-) -> None:
-    """Revoke (deactivate) an API key"""
-    api_key = await db.get(ApiKey, key_id)
+@router.get("/session", response_model=SessionResponse)
+async def get_session(
+    session_token: Optional[str] = Cookie(None)
+) -> SessionResponse:
+    """Check current session status."""
     
-    if not api_key:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="API key not found"
+    if not session_token:
+        return SessionResponse(
+            is_authenticated=False,
+            is_admin=False
         )
     
-    api_key.is_active = False
-    await db.commit()
+    email = AuthService.get_session_user(session_token)
+    
+    if not email:
+        return SessionResponse(
+            is_authenticated=False,
+            is_admin=False
+        )
+    
+    is_admin = AuthService.is_admin(session_token)
+    
+    return SessionResponse(
+        is_authenticated=True,
+        is_admin=is_admin,
+        email=email if is_admin else None
+    )

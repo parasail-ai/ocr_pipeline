@@ -1,11 +1,14 @@
-from fastapi import FastAPI, Request
+from typing import Optional
+
+from fastapi import Cookie, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.api.routes import get_api_router
 from app.core.config import get_settings
+from app.services.auth import AuthService
 
 settings = get_settings()
 
@@ -98,10 +101,28 @@ async def documents_page(request: Request) -> HTMLResponse:
 
 
 @app.get("/schemas", response_class=HTMLResponse)
-async def schemas_page(request: Request) -> HTMLResponse:
+async def schemas_page(
+    request: Request,
+    session_token: Optional[str] = Cookie(None)
+) -> HTMLResponse:
     """Schemas management page"""
+    is_admin = AuthService.is_admin(session_token)
+    
     return templates.TemplateResponse(
         "schemas.html",
+        {
+            "request": request,
+            "app_name": settings.app_name,
+            "is_admin": is_admin,
+        },
+    )
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request) -> HTMLResponse:
+    """Admin login page"""
+    return templates.TemplateResponse(
+        "login.html",
         {
             "request": request,
             "app_name": settings.app_name,
@@ -110,13 +131,21 @@ async def schemas_page(request: Request) -> HTMLResponse:
 
 
 @app.get("/models", response_class=HTMLResponse)
-async def models_page(request: Request) -> HTMLResponse:
-    """Models management page"""
+async def models_page(
+    request: Request,
+    session_token: Optional[str] = Cookie(None)
+) -> HTMLResponse:
+    """Models management page (admin only)"""
+    # Check if user is admin
+    if not AuthService.is_admin(session_token):
+        return RedirectResponse(url="/login?return=/models", status_code=status.HTTP_303_SEE_OTHER)
+    
     return templates.TemplateResponse(
         "models.html",
         {
             "request": request,
             "app_name": settings.app_name,
+            "is_admin": True,
         },
     )
 
