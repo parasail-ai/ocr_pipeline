@@ -971,7 +971,13 @@
                 
                 if (!response.ok) throw new Error('Failed to delete document');
                 
-                // Reload documents to reflect trash move
+                // Small delay to ensure backend update completes
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Reload folders first (in case trash was just created)
+                await loadFolders();
+                
+                // Then reload documents to reflect trash move
                 await loadDocuments();
             } catch (error) {
                 console.error('Error deleting document:', error);
