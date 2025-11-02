@@ -208,7 +208,7 @@ async def process_document_task(
         finally:
             temp_path.unlink(missing_ok=True)
 
-    # Extract key-value pairs and classify document (no auto-schema generation)
+    # Extract key-value pairs and auto-generate schema (but don't save as reusable template)
     base_text = parasail_text or docling_text
     if base_text:
         if initial_schema_id is None:
@@ -217,7 +217,11 @@ async def process_document_task(
                 base_text=base_text,
                 snippets={"parasail": parasail_text, "docling": docling_text},
             )
-            # Schema generation disabled - users must manually save schemas from UI
+            # Auto-generate schema for this document (not saved as reusable template)
+            await _auto_generate_schema(
+                document_id=document_id,
+                ocr_text=base_text,
+            )
         
         # Extract key-value pairs regardless of schema
         await _extract_key_value_pairs(
@@ -480,7 +484,10 @@ async def _auto_generate_schema(
     document_id: uuid.UUID,
     ocr_text: str,
 ) -> None:
-    """Auto-generate schema from OCR text using AI (parasail-glm-46) and apply to document."""
+    """
+    Auto-generate schema from OCR text using AI and apply to document.
+    Creates a DocumentSchema with extracted values but does NOT save as reusable template.
+    """
     logger.info("Auto-generating schema with AI for document %s", document_id)
     
     try:
@@ -530,39 +537,15 @@ async def _auto_generate_schema(
                 len(extracted_values)
             )
             
-            # Check if schema with this name already exists
-            stmt = select(SchemaDefinition).where(
-                func.lower(SchemaDefinition.name) == schema_name.lower()
-            )
-            existing_schema = await session.scalar(stmt)
-            
-            if existing_schema:
-                logger.info("Using existing schema '%s' for document %s", schema_name, document_id)
-                schema = existing_schema
-            else:
-                # Create new schema from AI output
-                schema = SchemaDefinition(
-                    name=schema_name,
-                    category=category,
-                    description=description,
-                    fields=fields,  # AI returns list of field dicts with key, query, description
-                )
-                session.add(schema)
-                await session.flush()
-                logger.info("Created new AI-generated schema '%s' with %d fields", schema_name, len(fields))
-            
-            # Apply schema to document with extracted values
+            # Create DocumentSchema directly WITHOUT saving to schema_definitions
+            # This attaches the schema data to this document only, not as a reusable template
             if extracted_values:
                 assignment = DocumentSchema(
                     document_id=document_id,
-                    schema_id=schema.id,
+                    schema_id=None,  # No reusable schema template
                     extracted_values=extracted_values
                 )
                 session.add(assignment)
-                
-                # Update document selected schema if not set
-                if not document.selected_schema_id:
-                    document.selected_schema_id = schema.id
                     
                 # Update detected type if not set
                 if not document.detected_type and category != "unknown":
@@ -570,10 +553,9 @@ async def _auto_generate_schema(
                     document.detected_confidence = 0.9  # AI-generated confidence
                 
                 logger.info(
-                    "Applied AI-generated schema '%s' to document %s with %d key-value pairs",
-                    schema_name,
-                    document_id,
-                    len(extracted_values)
+                    "Created document-specific schema with %d extracted fields for document %s",
+                    len(extracted_values),
+                    document_id
                 )
             
             await session.commit()
