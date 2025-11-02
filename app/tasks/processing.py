@@ -39,14 +39,35 @@ async def process_document_task(
     initial_schema_id: uuid.UUID | None,
 ) -> None:
     """Background task that fetches a document from blob storage, runs Docling, and triggers Parasail OCR."""
-    logger.info("Processing document %s", document_id)
+    logger.info("=" * 80)
+    logger.info(f"STARTING BACKGROUND PROCESSING FOR DOCUMENT {document_id}")
+    logger.info(f"Blob path: {blob_path}")
+    logger.info(f"Model: {model_name}")
+    logger.info(f"Content type: {content_type}")
+    logger.info("=" * 80)
+    
+    # Update status to show we're downloading from blob storage
+    await _update_document_status(
+        document_id,
+        status="downloading",
+        details={"stage": "downloading_from_blob", "blob_path": blob_path}
+    )
+    
     blob_service = BlobStorageService()
 
     try:
+        logger.info(f"Downloading document from blob storage: {blob_path}")
         file_bytes = await asyncio.to_thread(blob_service.download_document, blob_path)
+        logger.info(f"Downloaded {len(file_bytes)} bytes from blob storage")
+        
+        await _update_document_status(
+            document_id,
+            status="downloaded",
+            details={"stage": "downloaded", "file_size": len(file_bytes)}
+        )
     except Exception as exc:  # pragma: no cover - defensive logging
         logger.exception("Failed to download document %s from blob storage", document_id, exc_info=exc)
-        await _update_document_status(document_id, status="error", details={"error": str(exc)})
+        await _update_document_status(document_id, status="error", details={"error": str(exc), "stage": "download_failed"})
         return
 
     docling_extraction: dict[str, Any] | None = None
@@ -76,6 +97,16 @@ async def process_document_task(
 
     if model_name:
         try:
+            # Update status to show OCR is starting
+            await _update_document_status(
+                document_id,
+                status="ocr_processing",
+                details={"stage": "running_ocr", "model": model_name}
+            )
+            
+            logger.info(f"Starting Parasail OCR with model: {model_name}")
+            logger.info(f"Encoding {len(file_bytes)} bytes as base64")
+            
             client = ParasailOCRClient()
             parasail_response = await asyncio.to_thread(
                 client.extract_document,
@@ -84,10 +115,22 @@ async def process_document_task(
                 mime_type=content_type,
                 model=model_name,
             )
+            logger.info(f"Parasail OCR completed for document {document_id}")
+            
             parasail_text = _extract_text_from_parasail_response(parasail_response)
+            if parasail_text:
+                logger.info(f"Extracted {len(parasail_text)} characters of text from Parasail response")
+            else:
+                logger.warning(f"No text extracted from Parasail response for document {document_id}")
+                
         except Exception as exc:  # pragma: no cover - Parasail failure
             logger.exception("Parasail OCR failed for document %s", document_id, exc_info=exc)
             parasail_response = {"error": str(exc)}
+            await _update_document_status(
+                document_id,
+                status="ocr_failed",
+                details={"stage": "ocr_failed", "error": str(exc)}
+            )
 
     await _update_document_status(
         document_id,
