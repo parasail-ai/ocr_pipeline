@@ -123,7 +123,31 @@
     </style>
   </head>
   <body>
+    <nav class="navbar">
+      <div class="container">
+        <div class="nav-brand">
+          <span class="logo-icon">📄</span>
+          OCR Pipeline
+        </div>
+        <div class="nav-menu">
+          <a href="/" class="nav-link">Upload</a>
+          <a href="/documents" class="nav-link active">Documents</a>
+          <a href="/schemas" class="nav-link">Schemas</a>
+          <a href="/models" class="nav-link">Models</a>
+          <a href="/analytics" class="nav-link">Analytics</a>
+        </div>
+      </div>
+    </nav>
+
     <div class="staging-container">
+      <div style="margin-bottom: 1rem; padding: 1rem 0;">
+        <a href="/" style="color: #666; text-decoration: none;">Home</a>
+        <span style="margin: 0 0.5rem; color: #999;">›</span>
+        <a href="/documents" style="color: #666; text-decoration: none;">Documents</a>
+        <span style="margin: 0 0.5rem; color: #999;">›</span>
+        <span style="color: #333; font-weight: 500;">Processing</span>
+      </div>
+      
       <div class="staging-header">
         <h1 class="headline">Processing Document</h1>
         <p id="document-name"></p>
