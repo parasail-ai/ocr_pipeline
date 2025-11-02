@@ -413,21 +413,18 @@
             <form id="uploadForm">
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-icon">📎</div>
-                    <p class="upload-text">Drop your document here or click to browse</p>
-                    <p class="upload-hint">Supports PDF, PNG, JPG, JPEG, DOCX, PPTX, XLSX, HTML, CSV (Max 50MB)</p>
+                    <p class="upload-text">Drop your documents here or click to browse</p>
+                    <p class="upload-hint">Supports PDF, PNG, JPG, JPEG, DOCX, PPTX, XLSX, HTML, CSV (Max 50MB each, multiple files allowed)</p>
                 </div>
                 
-                <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.docx,.pptx,.xlsx,.html,.htm,.csv" hidden>
+                <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.docx,.pptx,.xlsx,.html,.htm,.csv" multiple hidden>
                 
                 <div class="file-info" id="fileInfo">
-                    <div class="file-info-header">
-                        <div class="file-info-icon">📄</div>
-                        <div class="file-info-details">
-                            <p class="file-info-name" id="fileName"></p>
-                            <p class="file-info-size" id="fileSize"></p>
-                        </div>
-                        <span class="remove-file" id="removeFile">✕</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <strong id="fileCount">0 files selected</strong>
+                        <button type="button" id="clearAll" style="background: #f44336; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">Clear All</button>
                     </div>
+                    <div id="fileList" style="max-height: 200px; overflow-y: auto;"></div>
                 </div>
 
                 <div class="upload-options">
@@ -503,9 +500,9 @@
             uploadArea: document.getElementById('uploadArea'),
             fileInput: document.getElementById('fileInput'),
             fileInfo: document.getElementById('fileInfo'),
-            fileName: document.getElementById('fileName'),
-            fileSize: document.getElementById('fileSize'),
-            removeFile: document.getElementById('removeFile'),
+            fileList: document.getElementById('fileList'),
+            fileCount: document.getElementById('fileCount'),
+            clearAll: document.getElementById('clearAll'),
             uploadForm: document.getElementById('uploadForm'),
             uploadBtn: document.getElementById('uploadBtn'),
             resetBtn: document.getElementById('resetBtn'),
@@ -516,7 +513,7 @@
             preprocessingSelect: document.getElementById('preprocessingSelect')
         };
 
-        let selectedFile = null;
+        let selectedFiles = [];
 
         // Load schemas
         async function loadSchemas() {
@@ -570,9 +567,10 @@
 
         // File input change handler
         elements.fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                handleFileSelect(file);
+            if (e.target.files.length > 0) {
+                Array.from(e.target.files).forEach(file => {
+                    handleFileSelect(file);
+                });
             }
         });
 
@@ -590,9 +588,10 @@
             e.preventDefault();
             elements.uploadArea.classList.remove('dragover');
             
-            const file = e.dataTransfer.files[0];
-            if (file) {
-                handleFileSelect(file);
+            if (e.dataTransfer.files.length > 0) {
+                Array.from(e.dataTransfer.files).forEach(file => {
+                    handleFileSelect(file);
+                });
             }
         });
 
@@ -647,11 +646,8 @@
                 }
             }
 
-            selectedFile = file;
-            elements.fileName.textContent = file.name;
-            elements.fileSize.textContent = formatFileSize(file.size);
-            elements.fileInfo.classList.add('show');
-            elements.uploadBtn.disabled = false;
+            selectedFiles.push(file);
+            updateFileList();
             hideStatus();
         }
         
@@ -671,24 +667,90 @@
             });
         }
 
-        // Remove file handler
-        elements.removeFile.addEventListener('click', (e) => {
-            e.stopPropagation();
-            clearFile();
-        });
-
-        // Clear file
-        function clearFile() {
-            selectedFile = null;
-            elements.fileInput.value = '';
-            elements.fileInfo.classList.remove('show');
-            elements.uploadBtn.disabled = true;
-            hideStatus();
+        // Update file list UI
+        function updateFileList() {
+            elements.fileList.innerHTML = '';
+            elements.fileCount.textContent = `${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''} selected`;
+            
+            if (selectedFiles.length > 0) {
+                elements.fileInfo.classList.add('show');
+                elements.uploadBtn.disabled = false;
+                
+                selectedFiles.forEach((file, index) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 8px; background: white; border-radius: 4px; margin-bottom: 4px;';
+                    
+                    const icon = document.createElement('div');
+                    icon.textContent = getFileIcon(file.name);
+                    icon.style.fontSize = '24px';
+                    
+                    const details = document.createElement('div');
+                    details.style.flex = '1';
+                    
+                    const name = document.createElement('div');
+                    name.textContent = file.name;
+                    name.style.cssText = 'font-weight: 500; font-size: 13px;';
+                    
+                    const size = document.createElement('div');
+                    size.textContent = formatFileSize(file.size);
+                    size.style.cssText = 'font-size: 12px; color: #666;';
+                    
+                    details.appendChild(name);
+                    details.appendChild(size);
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.textContent = '×';
+                    removeBtn.type = 'button';
+                    removeBtn.style.cssText = 'background: #f44336; color: white; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 18px; line-height: 1;';
+                    removeBtn.onclick = () => removeFile(index);
+                    
+                    fileItem.appendChild(icon);
+                    fileItem.appendChild(details);
+                    fileItem.appendChild(removeBtn);
+                    elements.fileList.appendChild(fileItem);
+                });
+            } else {
+                elements.fileInfo.classList.remove('show');
+                elements.uploadBtn.disabled = true;
+            }
         }
+        
+        // Get file icon based on extension
+        function getFileIcon(filename) {
+            const ext = filename.toLowerCase().split('.').pop();
+            const icons = {
+                'pdf': '📕',
+                'png': '🖼️',
+                'jpg': '🖼️',
+                'jpeg': '🖼️',
+                'docx': '📘',
+                'pptx': '📙',
+                'xlsx': '📗',
+                'html': '🌐',
+                'htm': '🌐',
+                'csv': '📊'
+            };
+            return icons[ext] || '📄';
+        }
+        
+        // Remove file from list
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFileList();
+        }
+        
+        // Clear all files
+        elements.clearAll.addEventListener('click', () => {
+            selectedFiles = [];
+            elements.fileInput.value = '';
+            updateFileList();
+        });
 
         // Reset button handler
         elements.resetBtn.addEventListener('click', () => {
-            clearFile();
+            selectedFiles = [];
+            elements.fileInput.value = '';
+            updateFileList();
             elements.schemaSelect.value = '';
             elements.modelSelect.value = '';
             elements.preprocessingSelect.value = 'automatic';
@@ -698,8 +760,8 @@
         elements.uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            if (!selectedFile) {
-                showStatus('Please select a file first', 'error');
+            if (selectedFiles.length === 0) {
+                showStatus('Please select at least one file first', 'error');
                 return;
             }
             
@@ -709,38 +771,70 @@
                 return;
             }
 
-            const formData = new FormData();
-            formData.append('file', selectedFile);
-            
-            if (elements.schemaSelect.value) {
-                formData.append('schema_id', elements.schemaSelect.value);
-            }
-            
-            formData.append('model_name', elements.modelSelect.value);
-            formData.append('preprocessing', elements.preprocessingSelect.value || 'automatic');
+            const totalFiles = selectedFiles.length;
+            let successCount = 0;
+            let failCount = 0;
+            const uploadedDocIds = [];
 
             try {
                 elements.uploadBtn.disabled = true;
                 elements.progressBar.classList.add('show');
-                showStatus('Uploading document...', 'info');
 
-                const response = await fetch('/api/documents', {
-                    method: 'POST',
-                    body: formData
-                });
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    const file = selectedFiles[i];
+                    showStatus(`Uploading ${i + 1} of ${totalFiles} files: ${file.name}...`, 'info');
 
-                if (!response.ok) {
-                    const data = await response.json().catch(() => ({}));
-                    throw new Error(data.detail || 'Upload failed');
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    
+                    if (elements.schemaSelect.value) {
+                        formData.append('schema_id', elements.schemaSelect.value);
+                    }
+                    
+                    formData.append('model_name', elements.modelSelect.value);
+                    formData.append('preprocessing', elements.preprocessingSelect.value || 'automatic');
+
+                    try {
+                        const response = await fetch('/api/documents', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!response.ok) {
+                            const data = await response.json().catch(() => ({}));
+                            throw new Error(data.detail || 'Upload failed');
+                        }
+
+                        const document = await response.json();
+                        uploadedDocIds.push(document.id);
+                        successCount++;
+                    } catch (error) {
+                        console.error(`Upload error for ${file.name}:`, error);
+                        failCount++;
+                    }
                 }
 
-                const document = await response.json();
-                showStatus('Upload complete! Redirecting...', 'success');
+                // Show summary
+                if (failCount === 0) {
+                    showStatus(`All ${successCount} file${successCount !== 1 ? 's' : ''} uploaded successfully! Redirecting...`, 'success');
+                } else if (successCount === 0) {
+                    showStatus(`All ${failCount} file${failCount !== 1 ? 's' : ''} failed to upload`, 'error');
+                } else {
+                    showStatus(`${successCount} file${successCount !== 1 ? 's' : ''} uploaded, ${failCount} failed. Redirecting...`, 'info');
+                }
                 
-                // Redirect to staging page after brief delay
-                setTimeout(() => {
-                    window.location.href = `/staging/${document.id}`;
-                }, 800);
+                // Redirect to documents page after brief delay if any succeeded
+                if (successCount > 0) {
+                    setTimeout(() => {
+                        if (uploadedDocIds.length === 1) {
+                            window.location.href = `/staging/${uploadedDocIds[0]}`;
+                        } else {
+                            window.location.href = '/documents';
+                        }
+                    }, 1500);
+                } else {
+                    elements.uploadBtn.disabled = false;
+                }
 
             } catch (error) {
                 console.error('Upload error:', error);
