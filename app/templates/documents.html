@@ -813,30 +813,32 @@
         }
 
         function filterDocumentsByFolder(documents) {
-            let filtered = documents;
+            console.log('Filtering documents. currentFolderId:', currentFolderId, 'isAdmin:', isAdmin, 'trashFolderId:', trashFolderId);
             
-            console.log('Filtering documents. isAdmin:', isAdmin, 'trashFolderId:', trashFolderId);
+            // First filter by folder
+            let filtered;
+            if (currentFolderId === 'all') {
+                filtered = documents;
+            } else if (currentFolderId === 'uncategorized') {
+                filtered = documents.filter(doc => !doc.folder_id);
+            } else {
+                filtered = documents.filter(doc => doc.folder_id === currentFolderId);
+            }
             
-            // ALWAYS filter out trash documents for non-admin users (regardless of folder)
-            if (!isAdmin && trashFolderId) {
+            // Then filter out trash documents ONLY if not viewing trash folder and not admin
+            if (!isAdmin && trashFolderId && currentFolderId !== trashFolderId) {
                 const beforeCount = filtered.length;
                 filtered = filtered.filter(doc => {
                     const docFolderId = doc.folder_id ? String(doc.folder_id) : null;
                     const trashId = String(trashFolderId);
                     const isInTrash = docFolderId === trashId;
-                    console.log('Doc:', doc.original_filename, 'folder_id:', docFolderId, 'trash?:', isInTrash);
                     return !isInTrash;
                 });
-                console.log(`Filtered out ${beforeCount - filtered.length} trash documents`);
+                console.log(`Filtered out ${beforeCount - filtered.length} trash documents from non-trash view`);
             }
             
-            if (currentFolderId === 'all') {
-                return filtered;
-            } else if (currentFolderId === 'uncategorized') {
-                return filtered.filter(doc => !doc.folder_id);
-            } else {
-                return filtered.filter(doc => doc.folder_id === currentFolderId);
-            }
+            console.log(`Final filtered count: ${filtered.length}`);
+            return filtered;
         }
 
         function applyFilters(documents) {
