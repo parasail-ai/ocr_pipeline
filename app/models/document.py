@@ -24,6 +24,7 @@ class DocumentRead(BaseModel):
     schemas: list["DocumentSchemaAssignmentRead"] = []
     contents: list["DocumentContentRead"] = []
     classifications: list["DocumentClassificationRead"] = []
+    extractions: list["DocumentExtractionRead"] = []
 
     class Config:
         from_attributes = True

@@ -278,6 +278,7 @@ async def get_document(document_id: uuid.UUID, db: AsyncSession = Depends(get_db
             selectinload(Document.schemas).selectinload(DocumentSchema.schema),
             selectinload(Document.contents),
             selectinload(Document.classifications),
+            selectinload(Document.extractions),
         ),
     )
     if not document:
