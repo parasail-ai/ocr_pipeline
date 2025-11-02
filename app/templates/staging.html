@@ -798,15 +798,42 @@
         const fieldsDisplay = document.getElementById('extracted-fields-display');
         const saveSchemaBtn = document.getElementById('save-schema-btn');
         
-        if (!docData || !docData.schemas || docData.schemas.length === 0) {
-          fieldsDisplay.innerHTML = '<p style="color: #999; padding: 2rem; text-align: center;">No extracted fields yet. Processing in progress...</p>';
+        if (!docData) {
+          fieldsDisplay.innerHTML = '<p style="color: #999; padding: 2rem; text-align: center;">Loading...</p>';
           saveSchemaBtn.style.display = 'none';
           return;
         }
-
-        const schema = docData.schemas[0];
-        const values = schema.extracted_values || {};
-        const schemaInfo = schema.schema;
+        
+        // Get extracted values from either schemas or key-value extractions
+        let values = {};
+        let schemaInfo = null;
+        
+        // First check if there's a schema with extracted values
+        if (docData.schemas && docData.schemas.length > 0) {
+          const schema = docData.schemas[0];
+          values = schema.extracted_values || {};
+          schemaInfo = schema.schema;
+        }
+        
+        // If no schema values, check for key-value extractions
+        if (Object.keys(values).length === 0 && docData.extractions) {
+          const keyValueExtraction = docData.extractions.find(e => e.extraction_type === 'key_value');
+          if (keyValueExtraction && keyValueExtraction.data) {
+            values = keyValueExtraction.data;
+          }
+        }
+        
+        // If still no values, check classifications for suggested fields
+        if (Object.keys(values).length === 0 && docData.classifications && docData.classifications.length > 0) {
+          const classification = docData.classifications[0];
+          if (classification.extra && classification.extra.suggested_fields) {
+            // Show suggested fields from classification
+            values = classification.extra.suggested_fields.reduce((acc, field) => {
+              acc[field] = ''; // Empty value, just showing the field name
+              return acc;
+            }, {});
+          }
+        }
         
         // Show save button if we have extracted values and no saved schema
         if (Object.keys(values).length > 0 && !schemaInfo) {
@@ -816,7 +843,11 @@
         }
 
         if (Object.keys(values).length === 0) {
-          fieldsDisplay.innerHTML = '<p style="color: #999; padding: 2rem; text-align: center;">No fields extracted from this document.</p>';
+          if (docData.status === 'processed') {
+            fieldsDisplay.innerHTML = '<p style="color: #999; padding: 2rem; text-align: center;">No fields extracted from this document.</p>';
+          } else {
+            fieldsDisplay.innerHTML = '<p style="color: #999; padding: 2rem; text-align: center;">Processing document... Fields will appear here once extraction is complete.</p>';
+          }
           return;
         }
 
@@ -977,13 +1008,30 @@
           return;
         }
         
-        if (!docData || !docData.schemas || docData.schemas.length === 0) {
-          alert('No schema data available to save');
+        if (!docData) {
+          alert('No document data available');
           return;
         }
         
-        const schema = docData.schemas[0];
-        const values = schema.extracted_values || {};
+        // Get extracted values from either schemas or key-value extractions
+        let values = {};
+        
+        if (docData.schemas && docData.schemas.length > 0) {
+          values = docData.schemas[0].extracted_values || {};
+        }
+        
+        // If no schema values, get from key-value extractions
+        if (Object.keys(values).length === 0 && docData.extractions) {
+          const keyValueExtraction = docData.extractions.find(e => e.extraction_type === 'key_value');
+          if (keyValueExtraction && keyValueExtraction.data) {
+            values = keyValueExtraction.data;
+          }
+        }
+        
+        if (Object.keys(values).length === 0) {
+          alert('No extracted fields available to save as schema');
+          return;
+        }
         
         // Build fields array from extracted values
         const fields = Object.keys(values).map(key => ({
