@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Folder, Document
-from app.db.session import get_async_session
+from app.db.session import get_db
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 
@@ -44,7 +44,7 @@ class FolderListResponse(BaseModel):
 @router.post("", response_model=FolderResponse, status_code=201)
 async def create_folder(
     folder_data: FolderCreate,
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_db)
 ) -> Any:
     """Create a new folder"""
     
@@ -90,7 +90,7 @@ async def create_folder(
 
 @router.get("", response_model=FolderListResponse)
 async def list_folders(
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_db)
 ) -> Any:
     """List all folders with document counts"""
     
@@ -126,7 +126,7 @@ async def list_folders(
 @router.get("/{folder_id}", response_model=FolderResponse)
 async def get_folder(
     folder_id: UUID,
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_db)
 ) -> Any:
     """Get a specific folder by ID"""
     
@@ -159,7 +159,7 @@ async def get_folder(
 async def update_folder(
     folder_id: UUID,
     folder_data: FolderUpdate,
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_db)
 ) -> Any:
     """Update a folder"""
     
@@ -226,7 +226,7 @@ async def update_folder(
 @router.delete("/{folder_id}", status_code=204)
 async def delete_folder(
     folder_id: UUID,
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_db)
 ) -> None:
     """Delete a folder and move its documents to uncategorized"""
     
@@ -255,7 +255,7 @@ async def delete_folder(
 async def move_document_to_folder(
     folder_id: UUID,
     document_id: UUID,
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_db)
 ) -> None:
     """Move a document to a folder"""
     
@@ -283,7 +283,7 @@ async def move_document_to_folder(
 @router.delete("/documents/{document_id}/folder", status_code=204)
 async def remove_document_from_folder(
     document_id: UUID,
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_db)
 ) -> None:
     """Remove a document from its folder (move to uncategorized)"""
     
