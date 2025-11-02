@@ -70,6 +70,29 @@ class AISchemaGenerator:
             content = response.choices[0].message.content
             logger.info(f"AI schema generation response: {content[:200]}...")
             
+            # Strip any thinking tags or markdown formatting
+            content = content.strip()
+            
+            # Remove <think> tags if present
+            if '<think>' in content and '</think>' in content:
+                # Extract content between think tags and after
+                parts = content.split('</think>')
+                if len(parts) > 1:
+                    content = parts[1].strip()
+            
+            # Remove markdown code blocks if present
+            if content.startswith('```'):
+                lines = content.split('\n')
+                # Remove first line (```json or ```)
+                if lines[0].strip().startswith('```'):
+                    lines = lines[1:]
+                # Remove last line if it's ```
+                if lines and lines[-1].strip() == '```':
+                    lines = lines[:-1]
+                content = '\n'.join(lines).strip()
+            
+            logger.info(f"Cleaned content for JSON parsing: {content[:200]}...")
+            
             # Parse the JSON response
             result = json.loads(content)
             

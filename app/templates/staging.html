@@ -286,13 +286,27 @@
           ocrTextDisplay.style.color = "#999";
         }
 
-        // Update status items
-        updateStatus("upload", "complete", "Upload Complete", "Document stored in cloud");
+        // Update status items based on document.details.stage
+        const stage = document.details?.stage || "";
+        
+        // Upload status
+        if (document.blob_path) {
+          updateStatus("upload", "complete", "Upload Complete", `Stored in Azure: ${document.blob_path.split('/')[0]}...`);
+        } else {
+          updateStatus("upload", "processing", "Uploading", "Uploading to Microsoft storage...");
+        }
 
+        // OCR status
         if (document.ocr_results && document.ocr_results.length > 0) {
           const ocr = document.ocr_results[0];
           const duration = ocr.duration_ms ? ` (${ocr.duration_ms}ms)` : "";
-          updateStatus("ocr", "complete", "OCR Complete", `Text extracted successfully${duration}`);
+          updateStatus("ocr", "complete", "OCR Complete", `Text extracted with ${ocr.model_name}${duration}`);
+        } else if (stage === "running_ocr" || document.status === "ocr_processing") {
+          updateStatus("ocr", "processing", "OCR Processing", `Sending to Parasail model (base64 encoded)...`);
+        } else if (stage === "downloading_from_blob" || document.status === "downloading") {
+          updateStatus("ocr", "processing", "Preparing OCR", "Downloading from Azure storage...");
+        } else if (stage === "downloaded") {
+          updateStatus("ocr", "processing", "OCR Starting", "Encoding document as base64...");
         } else if (document.status === "processing" || document.status === "processed") {
           updateStatus("ocr", "processing", "OCR Processing", "Extracting text...");
         }
