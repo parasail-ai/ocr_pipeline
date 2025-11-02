@@ -314,7 +314,7 @@
     <script>
       const documentId = "{{ document_id }}";
       let pollInterval;
-      let document = null;
+      let docData = null;
       let startTime = Date.now();
       let timeInterval;
 
@@ -355,17 +355,17 @@
           const response = await fetch(`/api/documents/${documentId}`);
           if (!response.ok) throw new Error("Failed to load document");
           
-          document = await response.json();
+          docData = await response.json();
           updateUI();
           updateProgress();
           
           // Check if processing is complete
-          if (document.status === "processed") {
+          if (docData.status === "processed") {
             clearInterval(pollInterval);
             clearInterval(timeInterval);
             showSchema();
             hideProgress();
-          } else if (document.status === "error") {
+          } else if (docData.status === "error") {
             clearInterval(pollInterval);
             clearInterval(timeInterval);
             showError();
@@ -377,17 +377,17 @@
       }
 
       function updateUI() {
-        if (!document) return;
+        if (!docData) return;
 
-        console.log("Updating UI with document:", document);
+        console.log("Updating UI with document:", docData);
 
         // Update document name
-        document.getElementById("document-name").textContent = document.original_filename;
+        document.getElementById("document-name").textContent = docData.original_filename;
 
         // Update preview - use the content endpoint instead of blob_url
         const previewIframe = document.getElementById("document-preview");
-        if (document.id) {
-          const contentUrl = `/api/documents/${document.id}/content`;
+        if (docData.id) {
+          const contentUrl = `/api/documents/${docData.id}/content`;
           console.log("Setting preview src to:", contentUrl);
           previewIframe.src = contentUrl;
           
@@ -413,10 +413,10 @@
 
         // Update OCR text display
         const ocrTextDisplay = document.getElementById("ocr-text-display");
-        if (document.contents && document.contents.length > 0) {
+        if (docData.contents && docData.contents.length > 0) {
           // Show the OCR text - prefer parasail over docling
-          const parasailContent = document.contents.find(c => c.source === "parasail");
-          const doclingContent = document.contents.find(c => c.source === "docling");
+          const parasailContent = docData.contents.find(c => c.source === "parasail");
+          const doclingContent = docData.contents.find(c => c.source === "docling");
           const ocrContent = parasailContent || doclingContent;
           
           if (ocrContent && ocrContent.text) {
@@ -426,7 +426,7 @@
             ocrTextDisplay.textContent = "Processing...";
             ocrTextDisplay.style.color = "#999";
           }
-        } else if (document.status === "processing") {
+        } else if (docData.status === "processing") {
           ocrTextDisplay.textContent = "OCR processing in progress...";
           ocrTextDisplay.style.color = "#999";
         }
@@ -434,13 +434,13 @@
       }
 
       function showSchema() {
-        if (!document || !document.schemas || document.schemas.length === 0) {
+        if (!docData || !docData.schemas || docData.schemas.length === 0) {
           // Show message that schema generation is in progress
           return;
         }
 
         const schemaPanel = document.getElementById("schema-panel");
-        const schema = document.schemas[0];
+        const schema = docData.schemas[0];
         const schemaInfo = schema.schema;
 
         // Set description
@@ -474,10 +474,10 @@
 
         // Show raw extractions
         const rawData = {
-          ocr_text: document.contents?.[0]?.text?.substring(0, 500) + "..." || "No text",
+          ocr_text: docData.contents?.[0]?.text?.substring(0, 500) + "..." || "No text",
           schema_values: values,
-          tables: document.extractions?.filter(e => e.extraction_type === "table").length || 0,
-          key_value_pairs: document.extractions?.find(e => e.extraction_type === "key_value")?.data || {}
+          tables: docData.extractions?.filter(e => e.extraction_type === "table").length || 0,
+          key_value_pairs: docData.extractions?.find(e => e.extraction_type === "key_value")?.data || {}
         };
         document.getElementById("raw-extractions").textContent = JSON.stringify(rawData, null, 2);
 
@@ -489,13 +489,13 @@
       }
 
       function updateProgress() {
-        if (!document) return;
+        if (!docData) return;
         
         const statusDiv = document.getElementById('processing-status');
         const statusText = document.getElementById('status-text');
         const progressBar = document.getElementById('progress-bar');
         
-        if (document.status === 'processed') {
+        if (docData.status === 'processed') {
           statusDiv.style.display = 'none';
           return;
         }
@@ -506,15 +506,15 @@
         let progress = 10;
         let message = 'Initializing...';
         
-        if (document.status === 'uploaded') {
+        if (docData.status === 'uploaded') {
           progress = 20;
           message = 'Document uploaded, queued for processing...';
-        } else if (document.status === 'processing') {
+        } else if (docData.status === 'processing') {
           // Check what's been completed
-          const hasContents = document.contents && document.contents.length > 0;
-          const hasExtractions = document.extractions && document.extractions.length > 0;
-          const hasClassifications = document.classifications && document.classifications.length > 0;
-          const hasSchemas = document.schemas && document.schemas.length > 0;
+          const hasContents = docData.contents && docData.contents.length > 0;
+          const hasExtractions = docData.extractions && docData.extractions.length > 0;
+          const hasClassifications = docData.classifications && docData.classifications.length > 0;
+          const hasSchemas = docData.schemas && docData.schemas.length > 0;
           
           if (!hasContents) {
             progress = 30;
@@ -567,13 +567,13 @@
         });
 
         // Update schema values if changed
-        if (document.schemas && document.schemas.length > 0) {
+        if (docData.schemas && docData.schemas.length > 0) {
           try {
             const response = await fetch(`/api/documents/${documentId}/schemas`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                schema_id: document.schemas[0].schema_id,
+                schema_id: docData.schemas[0].schema_id,
                 values: updatedValues
               })
             });
@@ -614,12 +614,12 @@
       function updateExtractedFieldsTab() {
         const fieldsDisplay = document.getElementById('extracted-fields-display');
         
-        if (!document || !document.schemas || document.schemas.length === 0) {
+        if (!docData || !docData.schemas || docData.schemas.length === 0) {
           fieldsDisplay.innerHTML = '<p style="color: #999; padding: 2rem; text-align: center;">No extracted fields yet. Processing in progress...</p>';
           return;
         }
 
-        const schema = document.schemas[0];
+        const schema = docData.schemas[0];
         const values = schema.extracted_values || {};
         const schemaInfo = schema.schema;
 
@@ -654,7 +654,7 @@
       function updateJSONTab() {
         const jsonOutput = document.getElementById('json-output');
         
-        if (!document) {
+        if (!docData) {
           jsonOutput.textContent = JSON.stringify({
             status: "loading",
             message: "Loading document data..."
@@ -664,24 +664,24 @@
 
         // Build comprehensive JSON output
         const output = {
-          document_id: document.id,
-          filename: document.original_filename,
-          status: document.status,
-          uploaded_at: document.uploaded_at,
-          processed_at: document.last_processed_at,
-          detected_type: document.detected_type,
-          detected_confidence: document.detected_confidence,
-          blob_url: document.blob_url,
+          document_id: docData.id,
+          filename: docData.original_filename,
+          status: docData.status,
+          uploaded_at: docData.uploaded_at,
+          processed_at: docData.last_processed_at,
+          detected_type: docData.detected_type,
+          detected_confidence: docData.detected_confidence,
+          blob_url: docData.blob_url,
           ocr_results: null,
           extracted_fields: {},
           schema_info: null,
           tables: [],
-          processing_details: document.details || {}
+          processing_details: docData.details || {}
         };
 
         // Add OCR text
-        if (document.contents && document.contents.length > 0) {
-          const content = document.contents.find(c => c.source === "parasail") || document.contents[0];
+        if (docData.contents && docData.contents.length > 0) {
+          const content = docData.contents.find(c => c.source === "parasail") || docData.contents[0];
           output.ocr_results = {
             source: content.source,
             text: content.text,
@@ -690,8 +690,8 @@
         }
 
         // Add extracted fields
-        if (document.schemas && document.schemas.length > 0) {
-          const schema = document.schemas[0];
+        if (docData.schemas && docData.schemas.length > 0) {
+          const schema = docData.schemas[0];
           output.extracted_fields = schema.extracted_values || {};
           output.schema_info = {
             schema_id: schema.schema_id,
@@ -703,8 +703,8 @@
         }
 
         // Add tables
-        if (document.extractions) {
-          output.tables = document.extractions
+        if (docData.extractions) {
+          output.tables = docData.extractions
             .filter(e => e.extraction_type === "table")
             .map(e => ({
               table_index: e.extraction_metadata?.table_index,
@@ -716,12 +716,12 @@
         }
 
         // Add model info from OCR results
-        if (document.ocr_results && document.ocr_results.length > 0) {
+        if (docData.ocr_results && docData.ocr_results.length > 0) {
           output.model_info = {
-            model_name: document.ocr_results[0].model_name,
-            duration_ms: document.ocr_results[0].duration_ms,
-            started_at: document.ocr_results[0].started_at,
-            completed_at: document.ocr_results[0].completed_at
+            model_name: docData.ocr_results[0].model_name,
+            duration_ms: docData.ocr_results[0].duration_ms,
+            started_at: docData.ocr_results[0].started_at,
+            completed_at: docData.ocr_results[0].completed_at
           };
         }
 
@@ -740,14 +740,14 @@
       };
 
       window.downloadJSON = function() {
-        if (!document) return;
+        if (!docData) return;
         
         const jsonText = document.getElementById('json-output').textContent;
         const blob = new Blob([jsonText], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = window.document.createElement('a');
         a.href = url;
-        a.download = `${document.original_filename || 'document'}_extracted.json`;
+        a.download = `${docData.original_filename || 'document'}_extracted.json`;
         window.document.body.appendChild(a);
         a.click();
         window.document.body.removeChild(a);
