@@ -412,16 +412,18 @@
 </head>
 <body>
     <nav class="navbar">
-        <div class="nav-brand">
-            <span class="logo-icon">📄</span>
-            OCR Pipeline
-        </div>
-        <div class="nav-menu">
-            <a href="/" class="nav-link">Upload</a>
-            <a href="/documents" class="nav-link active">Documents</a>
-            <a href="/schemas" class="nav-link">Schemas</a>
-            <a href="/models" class="nav-link">Models</a>
-            <a href="/analytics" class="nav-link">Analytics</a>
+        <div class="container">
+            <div class="nav-brand">
+                <span class="logo-icon">📄</span>
+                OCR Pipeline
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Upload</a>
+                <a href="/documents" class="nav-link active">Documents</a>
+                <a href="/schemas" class="nav-link">Schemas</a>
+                <a href="/models" class="nav-link">Models</a>
+                <a href="/analytics" class="nav-link">Analytics</a>
+            </div>
         </div>
     </nav>
 
@@ -519,8 +521,8 @@
                 const response = await fetch('/api/documents');
                 if (!response.ok) throw new Error('Failed to load documents');
                 
-                const documents = await response.json();
-                allDocuments = documents;
+                const data = await response.json();
+                allDocuments = data.items || data;
                 
                 updateFolderCounts();
                 renderDocuments();
@@ -533,12 +535,12 @@
         async function loadFolders() {
             try {
                 const response = await fetch('/api/folders');
-                if (!response.ok) return; // Folders not yet implemented
+                if (!response.ok) return;
                 
-                const folders = await response.json();
+                const data = await response.json();
+                const folders = data.items || data;
                 renderFolders(folders);
             } catch (error) {
-                // Folders endpoint not yet implemented
                 console.log('Folders not yet available');
             }
         }
@@ -671,15 +673,15 @@
             const status = getDocumentStatus(doc);
             const statusClass = status;
             const statusText = status.charAt(0).toUpperCase() + status.slice(1);
-            const icon = getDocumentIcon(doc.filename);
-            const date = new Date(doc.created_at).toLocaleDateString();
+            const icon = getDocumentIcon(doc.original_filename || doc.filename);
+            const date = new Date(doc.uploaded_at || doc.created_at).toLocaleDateString();
             
             return `
                 <div class="document-card" onclick="openDocument('${doc.id}')">
                     <div class="document-card-header">
                         <div class="document-icon">${icon}</div>
                         <div class="document-info">
-                            <h3 class="document-name" title="${escapeHtml(doc.filename)}">${escapeHtml(doc.filename)}</h3>
+                            <h3 class="document-name" title="${escapeHtml(doc.original_filename || doc.filename)}">${escapeHtml(doc.original_filename || doc.filename)}</h3>
                             <div class="document-meta">
                                 <div>Uploaded: ${date}</div>
                                 ${doc.file_size ? `<div>Size: ${formatFileSize(doc.file_size)}</div>` : ''}
@@ -698,8 +700,8 @@
         }
 
         function getDocumentStatus(doc) {
-            if (doc.processing_status === 'completed') return 'completed';
-            if (doc.processing_status === 'failed') return 'failed';
+            if (doc.status === 'completed') return 'completed';
+            if (doc.status === 'failed') return 'failed';
             return 'processing';
         }
 
