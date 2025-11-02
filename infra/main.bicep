@@ -125,7 +125,7 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
           value: storageConnectionString
         }
       ])
-      appCommandLine: 'gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind=0.0.0.0:8000'
+      appCommandLine: 'bash startup.sh'
       alwaysOn: true
       ftpsState: 'Disabled'
     }
