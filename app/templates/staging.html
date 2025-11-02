@@ -597,11 +597,10 @@
         // Update OCR text display
         const ocrTextDisplay = document.getElementById("ocr-text-display");
         if (docData.contents && docData.contents.length > 0) {
-          // Show the OCR text - prefer docstrange over parasail over docling
-          const docstrangeContent = docData.contents.find(c => c.source === "docstrange");
+          // Show the OCR text - prefer parasail over docling
           const parasailContent = docData.contents.find(c => c.source === "parasail");
           const doclingContent = docData.contents.find(c => c.source === "docling");
-          const ocrContent = docstrangeContent || parasailContent || doclingContent;
+          const ocrContent = parasailContent || doclingContent;
           
           if (ocrContent && ocrContent.text) {
             ocrTextDisplay.textContent = ocrContent.text;
@@ -958,10 +957,9 @@
           processing_details: docData.details || {}
         };
 
-        // Add OCR text - prefer docstrange over parasail
+        // Add OCR text - prefer parasail
         if (docData.contents && docData.contents.length > 0) {
-          const content = docData.contents.find(c => c.source === "docstrange") || 
-                         docData.contents.find(c => c.source === "parasail") || 
+          const content = docData.contents.find(c => c.source === "parasail") || 
                          docData.contents[0];
           output.ocr_results = {
             source: content.source,

@@ -49,10 +49,10 @@ async def upload_document(
         
         # Validate PDF page count (max 5 pages)
         if file.content_type == 'application/pdf':
-            from app.services.pdf_splitter import PDFSplitterService
-            pdf_splitter = PDFSplitterService()
-            if pdf_splitter.is_pdf(file_bytes):
-                page_count = pdf_splitter.get_page_count(file_bytes)
+            from app.services.document_converter import DocumentConverterService
+            converter = DocumentConverterService()
+            if converter.is_pdf(file_bytes):
+                page_count = converter.get_page_count(file_bytes)
                 if page_count > 5:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
@@ -375,6 +375,8 @@ async def get_document_content(document_id: uuid.UUID, db: AsyncSession = Depend
     """
     Stream the original document file from blob storage
     This endpoint serves the actual document file (PDF, image, etc.) for preview/download
+    
+    For CSV files, converts to HTML table for easy browser preview
     """
     document = await db.get(Document, document_id)
     if not document:
@@ -387,14 +389,132 @@ async def get_document_content(document_id: uuid.UUID, db: AsyncSession = Depend
         
         # Determine content type based on filename extension
         content_type = "application/octet-stream"
-        if document.original_filename:
-            filename_lower = document.original_filename.lower()
-            if filename_lower.endswith('.pdf'):
-                content_type = "application/pdf"
-            elif filename_lower.endswith(('.png', '.jpg', '.jpeg')):
-                content_type = f"image/{filename_lower.split('.')[-1].replace('jpg', 'jpeg')}"
-            elif filename_lower.endswith('.tiff') or filename_lower.endswith('.tif'):
-                content_type = "image/tiff"
+        filename_lower = document.original_filename.lower() if document.original_filename else ""
+        
+        # Handle different file types
+        if filename_lower.endswith('.pdf'):
+            content_type = "application/pdf"
+        elif filename_lower.endswith(('.png', '.jpg', '.jpeg')):
+            content_type = f"image/{filename_lower.split('.')[-1].replace('jpg', 'jpeg')}"
+        elif filename_lower.endswith(('.tiff', '.tif')):
+            content_type = "image/tiff"
+        elif filename_lower.endswith('.csv'):
+            # Convert CSV to HTML table for browser preview
+            import csv
+            from io import StringIO, BytesIO
+            
+            try:
+                csv_text = file_content.decode('utf-8')
+                csv_reader = csv.reader(StringIO(csv_text))
+                rows = list(csv_reader)
+                
+                # Generate HTML table
+                html = '''
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>CSV Preview</title>
+                    <style>
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            margin: 0;
+                            padding: 20px;
+                            background: #f5f5f5;
+                        }
+                        .container {
+                            max-width: 1400px;
+                            margin: 0 auto;
+                            background: white;
+                            border-radius: 8px;
+                            padding: 20px;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                            overflow-x: auto;
+                        }
+                        h1 {
+                            margin: 0 0 20px 0;
+                            font-size: 24px;
+                            color: #333;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            font-size: 14px;
+                        }
+                        th, td {
+                            padding: 12px;
+                            text-align: left;
+                            border: 1px solid #ddd;
+                        }
+                        th {
+                            background: #673ab7;
+                            color: white;
+                            font-weight: 600;
+                            position: sticky;
+                            top: 0;
+                            z-index: 10;
+                        }
+                        tr:nth-child(even) {
+                            background: #f9f9f9;
+                        }
+                        tr:hover {
+                            background: #f0f0f0;
+                        }
+                        .stats {
+                            margin-bottom: 15px;
+                            padding: 10px;
+                            background: #e3f2fd;
+                            border-radius: 4px;
+                            font-size: 13px;
+                            color: #1976d2;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>📊 CSV Preview: ''' + document.original_filename + '''</h1>
+                        <div class="stats">
+                            📈 Rows: ''' + str(len(rows)) + ''' | 📋 Columns: ''' + (str(len(rows[0])) if rows else '0') + '''
+                        </div>
+                        <table>
+                '''
+                
+                # Add header row
+                if rows:
+                    html += '<thead><tr>'
+                    for cell in rows[0]:
+                        html += f'<th>{cell}</th>'
+                    html += '</tr></thead>'
+                    
+                    # Add data rows
+                    html += '<tbody>'
+                    for row in rows[1:]:
+                        html += '<tr>'
+                        for cell in row:
+                            html += f'<td>{cell}</td>'
+                        html += '</tr>'
+                    html += '</tbody>'
+                
+                html += '''
+                        </table>
+                    </div>
+                </body>
+                </html>
+                '''
+                
+                file_content = html.encode('utf-8')
+                content_type = "text/html; charset=utf-8"
+            except Exception as csv_error:
+                logger.warning(f"Failed to convert CSV to HTML: {csv_error}, serving as text")
+                content_type = "text/csv"
+        elif filename_lower.endswith(('.html', '.htm')):
+            content_type = "text/html"
+        elif filename_lower.endswith('.docx'):
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        elif filename_lower.endswith('.xlsx'):
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        elif filename_lower.endswith('.pptx'):
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
         
         # Return as streaming response
         from io import BytesIO

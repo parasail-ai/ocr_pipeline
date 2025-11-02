@@ -1,0 +1,61 @@
+# Git files
+.git
+.gitignore
+.github
+
+# Python cache
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist
+build
+
+# Virtual environments
+venv
+env
+ENV
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation
+*.md
+!README.md
+docs
+
+# Tests
+tests
+*.test.py
+.pytest_cache
+.coverage
+
+# Local development files
+.env
+.env.local
+*.log
+
+# Unnecessary for Docker build
+sitecustomize.py
+startup.sh
+wsgi.py
+fix_path.pth
+generate_azure_credentials.sh
+GITHUB_ACTIONS_SETUP.md
+DOCSTRANGE_INTEGRATION_SUMMARY.md
+DEPLOYMENT.md
+ANALYTICS_IMPLEMENTATION.md
+
+# Infrastructure (not needed in container)
+infra
+
+# Alembic versions (can be large, but we need them)
+# alembic/versions
+
+# Mac
+.DS_Store

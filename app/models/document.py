@@ -97,7 +97,7 @@ class DocumentExtractionRead(BaseModel):
     extraction_type: str
     source: str
     data: dict[str, Any]
-    metadata: dict[str, Any]
+    extraction_metadata: dict[str, Any]
     created_at: datetime
 
     class Config:

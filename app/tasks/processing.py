@@ -29,6 +29,7 @@ from app.services.parasail import ParasailOCRClient
 from app.services.document_converter import DocumentConverterService
 from app.services.schema_generator import SchemaGenerator
 from app.services.table_extractor import TableExtractor
+from app.services.text_extractor import TextExtractionService
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,95 @@ async def process_document_task(
     docling_extraction: dict[str, Any] | None = None
     docling_text: str | None = None
     
+    # Check if we can extract text directly without OCR (for HTML, CSV, DOCX, etc.)
+    text_extractor = TextExtractionService()
+    filename = Path(blob_path).name
+    
+    if text_extractor.can_extract_text(content_type, filename):
+        logger.info(f"Document {filename} is a structured format - extracting text directly without OCR")
+        
+        await _update_document_status(
+            document_id,
+            status="extracting_text",
+            details={"stage": "text_extraction", "format": "structured"}
+        )
+        
+        try:
+            # Extract text directly from structured document
+            extraction_result = await asyncio.to_thread(
+                text_extractor.extract_text,
+                file_bytes,
+                content_type,
+                filename
+            )
+            
+            extracted_text = extraction_result.get("text", "")
+            structured_data = extraction_result.get("structured_data")
+            format_type = extraction_result.get("format", "unknown")
+            
+            logger.info(
+                f"Text extraction completed for {filename}: format={format_type}, "
+                f"text_length={len(extracted_text)}, has_structured_data={structured_data is not None}"
+            )
+            
+            # Use extracted text as if it came from OCR
+            parasail_text = extracted_text
+            parasail_response = {
+                "source": "text_extraction",
+                "format": format_type,
+                "text": extracted_text,
+                "structured_data": structured_data,
+                "extraction_method": "direct"
+            }
+            
+            # Store as content
+            await _store_document_contents(
+                document_id=document_id,
+                contents={
+                    "text_extraction": extracted_text,
+                },
+            )
+            
+            # Store extraction result
+            if structured_data:
+                async with AsyncSessionLocal() as session:
+                    extraction = DocumentExtraction(
+                        document_id=document_id,
+                        extraction_type="structured_data",
+                        source="text_extraction",
+                        data=structured_data,
+                        extraction_metadata={
+                            "format": format_type,
+                            "text_length": len(extracted_text),
+                        }
+                    )
+                    session.add(extraction)
+                    await session.commit()
+            
+            await _update_document_status(
+                document_id,
+                status="processing",
+                details={
+                    "content_type": content_type,
+                    "stage": "text_extracted",
+                    "format": format_type,
+                    "extraction_method": "direct",
+                    "text_length": len(extracted_text),
+                },
+            )
+            
+            # Skip OCR section entirely - text is already extracted
+            model_name = None  # Prevent OCR processing below
+            
+        except Exception as exc:
+            logger.exception("Text extraction failed for document %s", document_id, exc_info=exc)
+            await _update_document_status(
+                document_id,
+                status="error",
+                details={"stage": "text_extraction_failed", "error": str(exc)}
+            )
+            return
+    
     # Only use Docling if no model is specified (disabled by default)
     # Users must select a Parasail model for OCR processing
     if not model_name:
@@ -99,17 +189,18 @@ async def process_document_task(
             client = ParasailOCRClient()
             
             # Check if this is a multi-page PDF
-            pdf_splitter = PDFSplitterService()
-            if pdf_splitter.is_pdf(file_bytes):
-                page_count = await asyncio.to_thread(pdf_splitter.get_page_count, file_bytes)
+            converter = DocumentConverterService()
+            if converter.is_pdf(file_bytes):
+                page_count = await asyncio.to_thread(converter.get_page_count, file_bytes)
                 logger.info(f"Detected PDF with {page_count} pages")
                 
                 if page_count > 1:
                     # Split PDF into individual page images
                     logger.info(f"Splitting PDF into {page_count} page images...")
                     page_images = await asyncio.to_thread(
-                        pdf_splitter.split_pdf_to_images,
+                        converter.convert_to_images,
                         file_bytes,
+                        "document.pdf",
                         dpi=200  # Good quality for OCR
                     )
                     logger.info(f"Split {len(page_images)} pages successfully")

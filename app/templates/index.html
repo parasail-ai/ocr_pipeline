@@ -446,7 +446,6 @@
                         <label for="preprocessingSelect">Pre-Processing</label>
                         <select id="preprocessingSelect">
                             <option value="automatic">Automatic</option>
-                            <option value="docstrange">DocStrange (PDF, DOCX, PPTX, XLSX, HTML, CSV)</option>
                         </select>
                     </div>
                 </div>
@@ -624,47 +623,10 @@
                 showStatus('File size must be less than 50MB', 'error');
                 return;
             }
-            
-            // Auto-select DocStrange for office documents
-            const officeExtensions = ['.docx', '.pptx', '.xlsx', '.html', '.htm', '.csv'];
-            if (officeExtensions.some(ext => fileName.endsWith(ext))) {
-                elements.preprocessingSelect.value = 'docstrange';
-                showStatus('DocStrange preprocessing auto-selected for office document', 'info');
-                setTimeout(() => hideStatus(), 3000);
-            }
-            
-            // Validate PDF page count (max 5 pages)
-            if (file.type === 'application/pdf') {
-                try {
-                    const pageCount = await getPDFPageCount(file);
-                    if (pageCount > 5) {
-                        showStatus('Sorry, no PDFs larger than 5 pages', 'error');
-                        return;
-                    }
-                } catch (error) {
-                    console.error('Error checking PDF page count:', error);
-                }
-            }
 
             selectedFiles.push(file);
             updateFileList();
             hideStatus();
-        }
-        
-        // Get PDF page count
-        async function getPDFPageCount(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = function() {
-                    const data = new Uint8Array(reader.result);
-                    // Count occurrences of "/Type /Page" in the PDF
-                    const text = String.fromCharCode.apply(null, data);
-                    const matches = text.match(/\/Type\s*\/Page[^s]/g);
-                    resolve(matches ? matches.length : 1);
-                };
-                reader.onerror = reject;
-                reader.readAsArrayBuffer(file);
-            });
         }
 
         // Update file list UI
