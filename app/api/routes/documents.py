@@ -101,22 +101,25 @@ async def upload_document(
         db.add(document)
         await db.flush()
         
-        # Create metrics record
-        # Get real client IP (behind Azure proxy/load balancer)
-        client_ip = (
-            request.headers.get("x-forwarded-for", "").split(",")[0].strip() or
-            request.headers.get("x-real-ip") or
-            (request.client.host if request.client else None)
-        )
-        user_agent = request.headers.get("user-agent")
-        
-        metrics = DocumentMetrics(
-            document_id=document.id,
-            ip_address=client_ip,
-            user_agent=user_agent,
-            ocr_model=model_name,
-        )
-        db.add(metrics)
+        # Create metrics record (optional - skip if table doesn't exist)
+        try:
+            # Get real client IP (behind Azure proxy/load balancer)
+            client_ip = (
+                request.headers.get("x-forwarded-for", "").split(",")[0].strip() or
+                request.headers.get("x-real-ip") or
+                (request.client.host if request.client else None)
+            )
+            user_agent = request.headers.get("user-agent")
+            
+            metrics = DocumentMetrics(
+                document_id=document.id,
+                ip_address=client_ip,
+                user_agent=user_agent,
+                ocr_model=model_name,
+            )
+            db.add(metrics)
+        except Exception as e:
+            logger.warning(f"Metrics table not available, skipping: {e}")
         
         await db.commit()
         await db.refresh(
