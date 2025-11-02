@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Processing Document - {{ app_name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Flex:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/main.css" />
+    <script type="module" src="https://esm.run/@material/web/all.js"></script>
+    <style>
+      .staging-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+      .staging-header {
+        margin-bottom: 2rem;
+      }
+      .staging-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        margin-bottom: 2rem;
+      }
+      @media (max-width: 968px) {
+        .staging-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .preview-panel {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .preview-frame {
+        width: 100%;
+        height: 600px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+      }
+      .status-panel {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .status-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        background: #f5f5f5;
+        border-radius: 8px;
+      }
+      .status-item.complete {
+        background: #e8f5e9;
+      }
+      .status-item.processing {
+        background: #fff3e0;
+      }
+      .status-item.error {
+        background: #ffebee;
+      }
+      .status-icon {
+        margin-right: 1rem;
+        font-size: 24px;
+      }
+      .schema-panel {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem;
+      }
+      .schema-field {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        align-items: start;
+      }
+      .schema-field-label {
+        font-weight: 500;
+        padding: 0.5rem 0;
+      }
+      .schema-field-input {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-family: inherit;
+        font-size: 14px;
+      }
+      .schema-field-input:focus {
+        outline: none;
+        border-color: #1976d2;
+      }
+      .action-buttons {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+      }
+      .extraction-preview {
+        background: #f5f5f5;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-top: 1rem;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .extraction-preview pre {
+        margin: 0;
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="staging-container">
+      <div class="staging-header">
+        <h1 class="headline">Processing Document</h1>
+        <p id="document-name"></p>
+      </div>
+
+      <div class="staging-grid">
+        <!-- Document Preview -->
+        <div class="preview-panel">
+          <h2 class="card-title">Document Preview</h2>
+          <iframe id="document-preview" class="preview-frame" title="Document preview"></iframe>
+        </div>
+
+        <!-- Processing Status -->
+        <div class="status-panel">
+          <h2 class="card-title">Processing Status</h2>
+          <div id="status-list">
+            <div class="status-item processing" id="status-upload">
+              <span class="status-icon">⏳</span>
+              <div>
+                <div><strong>Upload</strong></div>
+                <div>Uploading to storage...</div>
+              </div>
+            </div>
+            <div class="status-item" id="status-ocr">
+              <span class="status-icon">⏳</span>
+              <div>
+                <div><strong>OCR Processing</strong></div>
+                <div>Extracting text from document...</div>
+              </div>
+            </div>
+            <div class="status-item" id="status-tables">
+              <span class="status-icon">⏳</span>
+              <div>
+                <div><strong>Table Extraction</strong></div>
+                <div>Finding tables and structured data...</div>
+              </div>
+            </div>
+            <div class="status-item" id="status-schema">
+              <span class="status-icon">⏳</span>
+              <div>
+                <div><strong>Schema Generation</strong></div>
+                <div>Analyzing document and generating schema...</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="timing-info" style="margin-top: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 8px; display: none;">
+            <strong>Processing Time:</strong>
+            <div id="timing-details"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auto-Generated Schema -->
+      <div class="schema-panel" id="schema-panel" style="display: none;">
+        <h2 class="card-title">Auto-Generated Schema</h2>
+        <p id="schema-description"></p>
+        
+        <div id="schema-fields"></div>
+
+        <div class="extraction-preview">
+          <strong>Raw Extractions:</strong>
+          <pre id="raw-extractions"></pre>
+        </div>
+
+        <div class="action-buttons">
+          <md-filled-button id="save-document">Save to Documents</md-filled-button>
+          <md-filled-tonal-button id="edit-schema">Edit Schema</md-filled-tonal-button>
+          <md-outlined-button id="discard-document">Discard</md-outlined-button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      const documentId = "{{ document_id }}";
+      let pollInterval;
+      let document = null;
+
+      async function loadDocument() {
+        try {
+          const response = await fetch(`/api/documents/${documentId}`);
+          if (!response.ok) throw new Error("Failed to load document");
+          
+          document = await response.json();
+          updateUI();
+          
+          // Check if processing is complete
+          if (document.status === "processed") {
+            clearInterval(pollInterval);
+            showSchema();
+          } else if (document.status === "error") {
+            clearInterval(pollInterval);
+            showError();
+          }
+        } catch (error) {
+          console.error("Error loading document:", error);
+        }
+      }
+
+      function updateUI() {
+        if (!document) return;
+
+        // Update document name
+        document.getElementById("document-name").textContent = document.original_filename;
+
+        // Update preview
+        document.getElementById("document-preview").src = document.blob_url;
+
+        // Update status items
+        updateStatus("upload", "complete", "Upload Complete", "Document stored in cloud");
+
+        if (document.ocr_results && document.ocr_results.length > 0) {
+          const ocr = document.ocr_results[0];
+          const duration = ocr.duration_ms ? ` (${ocr.duration_ms}ms)` : "";
+          updateStatus("ocr", "complete", "OCR Complete", `Text extracted successfully${duration}`);
+        } else if (document.status === "processing" || document.status === "processed") {
+          updateStatus("ocr", "processing", "OCR Processing", "Extracting text...");
+        }
+
+        if (document.extractions && document.extractions.length > 0) {
+          const tableCount = document.extractions.filter(e => e.extraction_type === "table").length;
+          updateStatus("tables", "complete", "Table Extraction Complete", `Found ${tableCount} tables`);
+        } else if (document.status === "processed") {
+          updateStatus("tables", "complete", "Table Extraction Complete", "No tables found");
+        } else {
+          updateStatus("tables", "processing", "Table Extraction", "Analyzing document structure...");
+        }
+
+        if (document.schemas && document.schemas.length > 0) {
+          const schema = document.schemas[0];
+          const valueCount = Object.keys(schema.extracted_values || {}).length;
+          updateStatus("schema", "complete", "Schema Generated", `Extracted ${valueCount} fields`);
+        } else if (document.status === "processed") {
+          updateStatus("schema", "processing", "Generating Schema", "Analyzing document...");
+        }
+
+        // Show timing info if available
+        if (document.ocr_results && document.ocr_results.length > 0) {
+          const ocr = document.ocr_results[0];
+          if (ocr.duration_ms) {
+            const timingInfo = document.getElementById("timing-info");
+            const timingDetails = document.getElementById("timing-details");
+            timingInfo.style.display = "block";
+            timingDetails.innerHTML = `
+              <div>OCR Processing: ${ocr.duration_ms}ms</div>
+              <div>Model: ${ocr.model_name}</div>
+            `;
+          }
+        }
+      }
+
+      function updateStatus(id, status, title, message) {
+        const element = document.getElementById(`status-${id}`);
+        if (!element) return;
+
+        element.className = `status-item ${status}`;
+        const icon = status === "complete" ? "✅" : status === "error" ? "❌" : "⏳";
+        element.innerHTML = `
+          <span class="status-icon">${icon}</span>
+          <div>
+            <div><strong>${title}</strong></div>
+            <div>${message}</div>
+          </div>
+        `;
+      }
+
+      function showSchema() {
+        if (!document || !document.schemas || document.schemas.length === 0) {
+          // Show message that schema generation is in progress
+          return;
+        }
+
+        const schemaPanel = document.getElementById("schema-panel");
+        const schema = document.schemas[0];
+        const schemaInfo = schema.schema;
+
+        // Set description
+        document.getElementById("schema-description").textContent = 
+          schemaInfo ? schemaInfo.description || `Schema: ${schemaInfo.name}` : "Auto-generated schema";
+
+        // Render fields
+        const fieldsContainer = document.getElementById("schema-fields");
+        fieldsContainer.innerHTML = "";
+
+        const values = schema.extracted_values || {};
+        
+        Object.entries(values).forEach(([key, value]) => {
+          const fieldDiv = document.createElement("div");
+          fieldDiv.className = "schema-field";
+          
+          const label = document.createElement("div");
+          label.className = "schema-field-label";
+          label.textContent = key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+          
+          const input = document.createElement("input");
+          input.className = "schema-field-input";
+          input.type = "text";
+          input.value = value || "";
+          input.dataset.key = key;
+          
+          fieldDiv.appendChild(label);
+          fieldDiv.appendChild(input);
+          fieldsContainer.appendChild(fieldDiv);
+        });
+
+        // Show raw extractions
+        const rawData = {
+          ocr_text: document.contents?.[0]?.text?.substring(0, 500) + "..." || "No text",
+          schema_values: values,
+          tables: document.extractions?.filter(e => e.extraction_type === "table").length || 0,
+          key_value_pairs: document.extractions?.find(e => e.extraction_type === "key_value")?.data || {}
+        };
+        document.getElementById("raw-extractions").textContent = JSON.stringify(rawData, null, 2);
+
+        schemaPanel.style.display = "block";
+      }
+
+      function showError() {
+        updateStatus("ocr", "error", "Processing Failed", "An error occurred during processing");
+      }
+
+      // Event handlers
+      document.getElementById("save-document").addEventListener("click", async () => {
+        // Collect edited values
+        const inputs = document.querySelectorAll(".schema-field-input");
+        const updatedValues = {};
+        inputs.forEach(input => {
+          updatedValues[input.dataset.key] = input.value;
+        });
+
+        // Update schema values if changed
+        if (document.schemas && document.schemas.length > 0) {
+          try {
+            const response = await fetch(`/api/documents/${documentId}/schemas`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                schema_id: document.schemas[0].schema_id,
+                values: updatedValues
+              })
+            });
+
+            if (response.ok) {
+              window.location.href = "/documents";
+            } else {
+              alert("Failed to save changes");
+            }
+          } catch (error) {
+            console.error("Error saving:", error);
+            alert("Failed to save changes");
+          }
+        } else {
+          window.location.href = "/documents";
+        }
+      });
+
+      document.getElementById("edit-schema").addEventListener("click", () => {
+        alert("Schema editing will open in modal - feature coming soon!");
+      });
+
+      document.getElementById("discard-document").addEventListener("click", async () => {
+        if (confirm("Are you sure you want to discard this document?")) {
+          try {
+            const response = await fetch(`/api/documents/${documentId}`, {
+              method: "DELETE"
+            });
+            if (response.ok) {
+              window.location.href = "/";
+            }
+          } catch (error) {
+            console.error("Error discarding:", error);
+          }
+        }
+      });
+
+      // Start polling
+      loadDocument();
+      pollInterval = setInterval(loadDocument, 2000); // Poll every 2 seconds
+
+      // Cleanup on page unload
+      window.addEventListener("beforeunload", () => {
+        if (pollInterval) clearInterval(pollInterval);
+      });
+    </script>
+  </body>
+</html>

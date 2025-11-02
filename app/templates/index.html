@@ -295,10 +295,13 @@
             throw new Error(message);
           }
 
-          elements.uploadStatus.textContent = "Upload complete. Document is processing.";
-          elements.uploadForm.reset();
-          elements.fileLabel.textContent = "No file selected";
-          await listDocuments();
+          const document = await response.json();
+          elements.uploadStatus.textContent = "Upload complete. Redirecting to processing page...";
+          
+          // Redirect to staging page
+          setTimeout(() => {
+            window.location.href = `/staging/${document.id}`;
+          }, 500);
         } catch (error) {
           elements.uploadStatus.textContent = `Upload error: ${error.message}`;
         } finally {

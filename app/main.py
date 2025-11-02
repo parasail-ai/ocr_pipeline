@@ -72,6 +72,31 @@ async def home(request: Request) -> HTMLResponse:
     )
 
 
+@app.get("/staging/{document_id}", response_class=HTMLResponse)
+async def staging(request: Request, document_id: str) -> HTMLResponse:
+    """Staging page for document processing with real-time status updates"""
+    return templates.TemplateResponse(
+        "staging.html",
+        {
+            "request": request,
+            "app_name": settings.app_name,
+            "document_id": document_id,
+        },
+    )
+
+
+@app.get("/documents", response_class=HTMLResponse)
+async def documents_page(request: Request) -> HTMLResponse:
+    """Documents management page"""
+    return templates.TemplateResponse(
+        "index.html",  # Will create documents.html later
+        {
+            "request": request,
+            "app_name": settings.app_name,
+        },
+    )
+
+
 @app.get("/reference", include_in_schema=False, response_class=HTMLResponse)
 async def scalar_reference() -> HTMLResponse:
     html = SCALAR_TEMPLATE.format(title=settings.app_name, spec_url=app.openapi_url)
