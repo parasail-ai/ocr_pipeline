@@ -36,56 +36,82 @@ async def upload_document(
     schema_id: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentRead:
-    blob_service = BlobStorageService()
-    file_bytes = await file.read()
+    try:
+        logger.info(f"Starting upload for file: {file.filename}, model: {model_name}")
+        
+        # Read file content
+        file_bytes = await file.read()
+        logger.info(f"Read {len(file_bytes)} bytes from uploaded file")
+        
+        # Upload to blob storage
+        blob_service = BlobStorageService()
+        blob_path, blob_url = blob_service.upload_document(
+            content=file_bytes,
+            filename=file.filename,
+            content_type=file.content_type,
+        )
+        logger.info(f"Uploaded to blob storage: {blob_path}")
 
-    blob_path, blob_url = blob_service.upload_document(
-        content=file_bytes,
-        filename=file.filename,
-        content_type=file.content_type,
-    )
+        # Validate schema if provided
+        schema_uuid: uuid.UUID | None = None
+        if schema_id:
+            try:
+                schema_uuid = uuid.UUID(schema_id)
+            except ValueError as exc:
+                logger.error(f"Invalid schema ID format: {schema_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, 
+                    detail="Invalid schema identifier"
+                ) from exc
 
-    schema_uuid: uuid.UUID | None = None
-    if schema_id:
-        try:
-            schema_uuid = uuid.UUID(schema_id)
-        except ValueError as exc:  # pragma: no cover - validation guard
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid schema identifier") from exc
+            schema_exists = await db.scalar(select(SchemaDefinition.id).where(SchemaDefinition.id == schema_uuid))
+            if not schema_exists:
+                logger.error(f"Schema not found: {schema_uuid}")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schema not found")
 
-        schema_exists = await db.scalar(select(SchemaDefinition.id).where(SchemaDefinition.id == schema_uuid))
-        if not schema_exists:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schema not found")
+        # Create document record
+        document = Document(
+            original_filename=file.filename,
+            selected_model=model_name,
+            selected_schema_id=schema_uuid,
+            blob_path=blob_path,
+            blob_url=blob_url,
+            status="processing",
+            details={"content_type": file.content_type},
+        )
+        db.add(document)
+        await db.commit()
+        await db.refresh(document)
+        
+        logger.info(f"Created document record: {document.id}")
 
-    document = Document(
-        original_filename=file.filename,
-        selected_model=model_name,
-        selected_schema_id=schema_uuid,
-        blob_path=blob_path,
-        blob_url=blob_url,
-        status="processing",
-        details={"content_type": file.content_type},
-    )
-    db.add(document)
-    await db.commit()
-    await db.refresh(document)
+        # Queue background processing
+        logger.info(
+            "Queuing background processing for document %s with model=%s, schema=%s",
+            document.id,
+            model_name,
+            schema_uuid
+        )
+        background_tasks.add_task(
+            process_document_task,
+            document.id,
+            blob_path,
+            file.content_type,
+            model_name,
+            schema_uuid,
+        )
 
-    # Queue background processing
-    logger.info(
-        "Queuing background processing for document %s with model=%s, schema=%s",
-        document.id,
-        model_name,
-        schema_uuid
-    )
-    background_tasks.add_task(
-        process_document_task,
-        document.id,
-        blob_path,
-        file.content_type,
-        model_name,
-        schema_uuid,
-    )
-
-    return DocumentRead.model_validate(document)
+        return DocumentRead.model_validate(document)
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as exc:
+        logger.exception(f"Upload failed: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Upload failed: {str(exc)}"
+        )
 
 
 @router.get("/{document_id}/extractions", response_model=list[DocumentExtractionRead])
