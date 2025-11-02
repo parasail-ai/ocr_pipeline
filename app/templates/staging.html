@@ -213,16 +213,16 @@
       <!-- Tab Navigation -->
       <div style="margin-bottom: 1rem; border-bottom: 2px solid #e0e0e0;">
         <div style="display: flex; gap: 1rem;">
-          <button class="tab-btn active" onclick="switchTab('preview')" data-tab="preview">
+          <button class="tab-btn active" id="tab-btn-preview" data-tab="preview">
             📄 Original Document
           </button>
-          <button class="tab-btn" onclick="switchTab('ocr')" data-tab="ocr">
+          <button class="tab-btn" id="tab-btn-ocr" data-tab="ocr">
             📝 OCR Text
           </button>
-          <button class="tab-btn" onclick="switchTab('fields')" data-tab="fields">
+          <button class="tab-btn" id="tab-btn-fields" data-tab="fields">
             📊 Extracted Fields
           </button>
-          <button class="tab-btn" onclick="switchTab('json')" data-tab="json">
+          <button class="tab-btn" id="tab-btn-json" data-tab="json">
             💾 JSON Output
           </button>
         </div>
@@ -744,6 +744,14 @@
         window.document.body.removeChild(a);
         URL.revokeObjectURL(url);
       };
+
+      // Add click handlers to tab buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tabName = btn.getAttribute('data-tab');
+          window.switchTab(tabName);
+        });
+      });
 
       // Start polling
       loadDocument();
