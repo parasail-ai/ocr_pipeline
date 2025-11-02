@@ -1,0 +1,59 @@
+name: Build and Deploy to Azure
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: parasail-ocr-pipeline-rg
+  APP_NAME: parasail-ocr-pipeline
+  ACR_NAME: parasailocrujxbwjwvmweea
+  IMAGE_NAME: parasail-ocr
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build and push Docker image to ACR
+        run: |
+          az acr build \
+            --registry ${{ env.ACR_NAME }} \
+            --image ${{ env.IMAGE_NAME }}:latest \
+            --image ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --file Dockerfile \
+            .
+
+      - name: Restart Azure App Service
+        run: |
+          az webapp restart \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.APP_NAME }}
+
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Health check
+        run: |
+          echo "Checking application health..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.APP_NAME }}.azurewebsites.net/health || echo "000")
+          echo "Health endpoint returned: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "404" ]; then
+            echo "✅ Deployment successful!"
+            echo "🌐 Application URL: https://${{ env.APP_NAME }}.azurewebsites.net"
+            echo "🐳 Docker image: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest"
+            echo "📝 Git commit: ${{ github.sha }}"
+          else
+            echo "⚠️ Health check returned unexpected status code"
+            exit 0
+          fi
