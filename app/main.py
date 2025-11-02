@@ -152,15 +152,12 @@ async def models_page(
 
 @app.get("/analytics", response_class=HTMLResponse)
 async def analytics_page(request: Request) -> HTMLResponse:
-    """Analytics dashboard page (coming soon)"""
+    """Analytics dashboard page"""
     return templates.TemplateResponse(
-        "coming_soon.html",
+        "analytics.html",
         {
             "request": request,
-            "page_name": "analytics",
-            "page_title": "Analytics Dashboard",
-            "icon": "📊",
-            "description": "View processing statistics, model performance metrics, and usage analytics. This feature is coming soon!",
+            "app_name": settings.app_name,
         },
     )
 

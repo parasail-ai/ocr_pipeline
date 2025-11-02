@@ -2,14 +2,14 @@ import base64
 import logging
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies.auth import get_api_key_required
-from app.db.models import ApiProfile, Document, DocumentExtraction, DocumentSchema, SchemaDefinition
+from app.db.models import ApiProfile, Document, DocumentExtraction, DocumentMetrics, DocumentSchema, SchemaDefinition
 from app.db.session import get_db
 from app.models.document import (
     DocumentApplySchemaRequest,
@@ -32,6 +32,7 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
 @router.post("", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
 async def upload_document(
     background_tasks: BackgroundTasks,
+    request: Request,
     file: UploadFile = File(...),
     model_name: str | None = Form(None),
     schema_id: str | None = Form(None),
@@ -81,13 +82,27 @@ async def upload_document(
             details={"content_type": file.content_type},
         )
         db.add(document)
+        await db.flush()
+        
+        # Create metrics record
+        client_ip = request.client.host if request.client else None
+        user_agent = request.headers.get("user-agent")
+        
+        metrics = DocumentMetrics(
+            document_id=document.id,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            ocr_model=model_name,
+        )
+        db.add(metrics)
+        
         await db.commit()
         await db.refresh(
             document,
             attribute_names=["id", "original_filename", "selected_model", "blob_path", "blob_url", "uploaded_at", "status"]
         )
         
-        logger.info(f"Created document record: {document.id}")
+        logger.info(f"Created document record: {document.id} from IP: {client_ip}")
 
         # Queue background processing
         logger.info(

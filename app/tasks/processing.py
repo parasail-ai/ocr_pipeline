@@ -15,6 +15,7 @@ from app.db.models import (
     DocumentClassification,
     DocumentContent,
     DocumentExtraction,
+    DocumentMetrics,
     DocumentOcrResult,
     DocumentSchema,
     SchemaDefinition,
@@ -187,6 +188,12 @@ async def process_document_task(
             raw_response=parasail_response,
             extracted_text=parasail_text,
             summary=_build_summary(parasail_text, docling_text),
+        )
+        
+        # Update metrics with token usage and duration
+        await _update_metrics_with_ocr_data(
+            document_id=document_id,
+            parasail_response=parasail_response,
         )
 
     await _store_document_contents(
@@ -679,3 +686,39 @@ async def _extract_key_value_pairs(
     # We don't need a separate extraction step since AI does both at once
     logger.info("Key-value extraction handled by AI schema generation for document %s", document_id)
     return
+
+
+async def _update_metrics_with_ocr_data(
+    document_id: uuid.UUID,
+    parasail_response: dict[str, Any],
+) -> None:
+    """Update DocumentMetrics with token usage and duration from parasail_response."""
+    async with AsyncSessionLocal() as session:
+        stmt = select(DocumentMetrics).where(DocumentMetrics.document_id == document_id)
+        metrics = await session.scalar(stmt)
+        
+        if not metrics:
+            logger.warning("No metrics record found for document %s", document_id)
+            return
+        
+        # Extract token counts from usage field
+        usage = parasail_response.get("usage", {})
+        if usage:
+            metrics.prompt_tokens = usage.get("prompt_tokens")
+            metrics.completion_tokens = usage.get("completion_tokens")
+            metrics.total_tokens = usage.get("total_tokens")
+        
+        # Extract duration from timing
+        timing = parasail_response.get("_timing", {})
+        if timing:
+            metrics.ocr_duration_ms = timing.get("duration_ms")
+        
+        metrics.processed_at = datetime.utcnow()
+        await session.commit()
+        
+        logger.info(
+            "Updated metrics for document %s: tokens=%s, duration=%s ms",
+            document_id,
+            metrics.total_tokens,
+            metrics.ocr_duration_ms
+        )
