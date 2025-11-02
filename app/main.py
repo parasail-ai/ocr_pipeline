@@ -97,6 +97,51 @@ async def documents_page(request: Request) -> HTMLResponse:
     )
 
 
+@app.get("/schemas", response_class=HTMLResponse)
+async def schemas_page(request: Request) -> HTMLResponse:
+    """Schemas management page (coming soon)"""
+    return templates.TemplateResponse(
+        "coming_soon.html",
+        {
+            "request": request,
+            "page_name": "schemas",
+            "page_title": "Schema Management",
+            "icon": "📋",
+            "description": "Define and manage reusable schemas for document data extraction. This feature is coming soon!",
+        },
+    )
+
+
+@app.get("/models", response_class=HTMLResponse)
+async def models_page(request: Request) -> HTMLResponse:
+    """Models management page (coming soon)"""
+    return templates.TemplateResponse(
+        "coming_soon.html",
+        {
+            "request": request,
+            "page_name": "models",
+            "page_title": "Model Management",
+            "icon": "🤖",
+            "description": "Configure and manage OCR models with custom endpoints and API keys. This feature is coming soon!",
+        },
+    )
+
+
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics_page(request: Request) -> HTMLResponse:
+    """Analytics dashboard page (coming soon)"""
+    return templates.TemplateResponse(
+        "coming_soon.html",
+        {
+            "request": request,
+            "page_name": "analytics",
+            "page_title": "Analytics Dashboard",
+            "icon": "📊",
+            "description": "View processing statistics, model performance metrics, and usage analytics. This feature is coming soon!",
+        },
+    )
+
+
 @app.get("/reference", include_in_schema=False, response_class=HTMLResponse)
 async def scalar_reference() -> HTMLResponse:
     html = SCALAR_TEMPLATE.format(title=settings.app_name, spec_url=app.openapi_url)

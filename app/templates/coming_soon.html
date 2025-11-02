@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }} - OCR Pipeline</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .coming-soon-container {
+            min-height: calc(100vh - 200px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        .coming-soon-content {
+            max-width: 600px;
+        }
+        
+        .coming-soon-icon {
+            font-size: 120px;
+            margin-bottom: 32px;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .coming-soon-content h1 {
+            font-size: 48px;
+            margin: 0 0 16px 0;
+            color: var(--primary-color);
+        }
+        
+        .coming-soon-content p {
+            font-size: 18px;
+            color: #666;
+            margin: 0 0 32px 0;
+            line-height: 1.6;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            padding: 14px 32px;
+            background: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .back-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(103, 58, 183, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="logo-icon">📄</span>
+                OCR Pipeline
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Upload</a>
+                <a href="/documents" class="nav-link">Documents</a>
+                <a href="/schemas" class="nav-link {% if page_name == 'schemas' %}active{% endif %}">Schemas</a>
+                <a href="/models" class="nav-link {% if page_name == 'models' %}active{% endif %}">Models</a>
+                <a href="/analytics" class="nav-link {% if page_name == 'analytics' %}active{% endif %}">Analytics</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="coming-soon-container">
+            <div class="coming-soon-content">
+                <div class="coming-soon-icon">{{ icon }}</div>
+                <h1>{{ page_title }}</h1>
+                <p>{{ description }}</p>
+                <a href="/" class="back-btn">← Back to Upload</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
