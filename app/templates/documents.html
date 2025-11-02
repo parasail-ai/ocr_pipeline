@@ -672,6 +672,10 @@
                 const data = await response.json();
                 allDocuments = data.items || data;
                 
+                console.log('Loaded documents:', allDocuments.length);
+                console.log('Documents with folder_id:', allDocuments.filter(d => d.folder_id).map(d => ({id: d.id, filename: d.original_filename, folder_id: d.folder_id})));
+                console.log('TrashFolderId:', trashFolderId);
+                
                 updateFolderCounts();
                 renderDocuments();
                 
