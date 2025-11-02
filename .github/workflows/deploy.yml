@@ -1,0 +1,64 @@
+name: Deploy to Azure Web App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check publish profile secret
+        run: |
+          if [ -z "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" ]; then
+            echo "❌ ERROR: AZURE_WEBAPP_PUBLISH_PROFILE secret is NOT set!"
+            echo ""
+            echo "To fix:"
+            echo "1. Go to Azure Portal: https://portal.azure.com"
+            echo "2. Find App Service: parasail-ocr-pipeline"
+            echo "3. Click 'Get publish profile' button (download .PublishSettings file)"
+            echo "4. Go to GitHub: https://github.com/parasail-ai/ocr_pipeline/settings/secrets/actions"
+            echo "5. Create secret named: AZURE_WEBAPP_PUBLISH_PROFILE"
+            echo "6. Paste ENTIRE XML content from the .PublishSettings file"
+            echo ""
+            exit 1
+          else
+            echo "✅ AZURE_WEBAPP_PUBLISH_PROFILE secret exists"
+          fi
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'parasail-ocr-pipeline'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: .
+
+      - name: Health check
+        run: |
+          echo "Waiting for deployment to complete..."
+          sleep 30
+          echo "Checking application health..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://parasail-ocr-pipeline.azurewebsites.net/ || echo "000")
+          echo "Health endpoint returned: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+            echo "✅ Deployment successful!"
+            echo "🌐 Application URL: https://parasail-ocr-pipeline.azurewebsites.net"
+          else
+            echo "⚠️ Health check returned unexpected status code"
+          fi
