@@ -20,7 +20,7 @@ class OcrModelCreate(BaseModel):
     provider: str = Field(..., min_length=1, max_length=100)
     endpoint_url: str = Field(..., min_length=1, max_length=1024)
     api_key: str | None = Field(None, description="API key (will be encrypted)")
-    model_config: dict[str, Any] = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
     is_active: bool = Field(default=True)
 
 
@@ -29,23 +29,23 @@ class OcrModelUpdate(BaseModel):
     provider: str | None = Field(None, min_length=1, max_length=100)
     endpoint_url: str | None = Field(None, min_length=1, max_length=1024)
     api_key: str | None = Field(None, description="API key (will be encrypted)")
-    model_config: dict[str, Any] | None = None
+    config: dict[str, Any] | None = None
     is_active: bool | None = None
 
 
 class OcrModelResponse(BaseModel):
+    model_config = {"from_attributes": True}
+    
     id: uuid.UUID
     name: str
     display_name: str
     provider: str
     endpoint_url: str
     api_key_preview: str  # Masked version like "sk-****1234"
-    model_config: dict[str, Any]
+    config: dict[str, Any]
     is_active: bool
     created_at: str
     updated_at: str
-
-    model_config = {"from_attributes": True}
 
 
 class OcrModelListResponse(BaseModel):
@@ -92,7 +92,7 @@ async def list_models(
             provider=model.provider,
             endpoint_url=model.endpoint_url,
             api_key_preview=_mask_api_key(model.api_key_encrypted),
-            model_config=model.model_config or {},
+            config=model.model_config or {},
             is_active=model.is_active,
             created_at=model.created_at.isoformat(),
             updated_at=model.updated_at.isoformat(),
@@ -123,7 +123,7 @@ async def get_model(
         provider=model.provider,
         endpoint_url=model.endpoint_url,
         api_key_preview=_mask_api_key(model.api_key_encrypted),
-        model_config=model.model_config or {},
+        config=model.model_config or {},
         is_active=model.is_active,
         created_at=model.created_at.isoformat(),
         updated_at=model.updated_at.isoformat(),
@@ -153,7 +153,7 @@ async def create_model(
         provider=payload.provider,
         endpoint_url=payload.endpoint_url,
         api_key_encrypted=payload.api_key,  # TODO: Encrypt this
-        model_config=payload.model_config,
+        model_config=payload.config,
         is_active=payload.is_active,
     )
     
@@ -168,7 +168,7 @@ async def create_model(
         provider=model.provider,
         endpoint_url=model.endpoint_url,
         api_key_preview=_mask_api_key(model.api_key_encrypted),
-        model_config=model.model_config or {},
+        config=model.model_config or {},
         is_active=model.is_active,
         created_at=model.created_at.isoformat(),
         updated_at=model.updated_at.isoformat(),
@@ -198,8 +198,8 @@ async def update_model(
         model.endpoint_url = payload.endpoint_url
     if payload.api_key is not None:
         model.api_key_encrypted = payload.api_key  # TODO: Encrypt this
-    if payload.model_config is not None:
-        model.model_config = payload.model_config
+    if payload.config is not None:
+        model.model_config = payload.config
     if payload.is_active is not None:
         model.is_active = payload.is_active
     
@@ -213,7 +213,7 @@ async def update_model(
         provider=model.provider,
         endpoint_url=model.endpoint_url,
         api_key_preview=_mask_api_key(model.api_key_encrypted),
-        model_config=model.model_config or {},
+        config=model.model_config or {},
         is_active=model.is_active,
         created_at=model.created_at.isoformat(),
         updated_at=model.updated_at.isoformat(),
