@@ -329,15 +329,16 @@
         // Update document name
         document.getElementById("document-name").textContent = document.original_filename;
 
-        // Update preview
+        // Update preview - use the content endpoint instead of blob_url
         const previewIframe = document.getElementById("document-preview");
-        if (document.blob_url) {
-          console.log("Setting preview src to:", document.blob_url);
-          previewIframe.src = document.blob_url;
+        if (document.id) {
+          const contentUrl = `/api/documents/${document.id}/content`;
+          console.log("Setting preview src to:", contentUrl);
+          previewIframe.src = contentUrl;
           
           // Add error handler for iframe
           previewIframe.onerror = function() {
-            console.error("Failed to load document preview from:", document.blob_url);
+            console.error("Failed to load document preview from:", contentUrl);
             previewIframe.style.display = "none";
             const errorMsg = document.createElement("div");
             errorMsg.style.padding = "2rem";
@@ -345,14 +346,14 @@
             errorMsg.style.color = "#666";
             errorMsg.innerHTML = `
               <p>Unable to preview document in browser.</p>
-              <a href="${document.blob_url}" target="_blank" style="color: #1976d2; text-decoration: none;">
+              <a href="${contentUrl}" target="_blank" style="color: #1976d2; text-decoration: none;">
                 🔗 Open document in new tab
               </a>
             `;
             previewIframe.parentNode.appendChild(errorMsg);
           };
         } else {
-          console.warn("No blob_url available for document");
+          console.warn("No document ID available");
         }
 
         // Update OCR text display
@@ -486,8 +487,8 @@
         }
       });
 
-      // Tab switching
-      window.switchTab = function(tabName) {
+      // Tab switching - defined early so event listeners can reference it
+      function switchTab(tabName) {
         // Update tab buttons
         document.querySelectorAll('.tab-btn').forEach(btn => {
           btn.classList.remove('active');
@@ -514,7 +515,7 @@
         } else if (tabName === 'json') {
           updateJSONTab();
         }
-      };
+      }
 
       function updateExtractedFieldsTab() {
         const fieldsDisplay = document.getElementById('extracted-fields-display');
@@ -663,7 +664,7 @@
       document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const tabName = btn.getAttribute('data-tab');
-          window.switchTab(tabName);
+          switchTab(tabName);
         });
       });
 

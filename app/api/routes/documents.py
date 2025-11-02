@@ -3,6 +3,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -312,6 +313,50 @@ async def list_document_classifications(
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     return [DocumentClassificationRead.model_validate(item) for item in document.classifications]
+
+
+@router.get("/{document_id}/content")
+async def get_document_content(document_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> StreamingResponse:
+    """
+    Stream the original document file from blob storage
+    This endpoint serves the actual document file (PDF, image, etc.) for preview/download
+    """
+    document = await db.get(Document, document_id)
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    
+    try:
+        # Download the document from blob storage
+        blob_service = BlobStorageService()
+        file_content = blob_service.download_document(document.blob_path)
+        
+        # Determine content type based on filename extension
+        content_type = "application/octet-stream"
+        if document.original_filename:
+            filename_lower = document.original_filename.lower()
+            if filename_lower.endswith('.pdf'):
+                content_type = "application/pdf"
+            elif filename_lower.endswith(('.png', '.jpg', '.jpeg')):
+                content_type = f"image/{filename_lower.split('.')[-1].replace('jpg', 'jpeg')}"
+            elif filename_lower.endswith('.tiff') or filename_lower.endswith('.tif'):
+                content_type = "image/tiff"
+        
+        # Return as streaming response
+        from io import BytesIO
+        return StreamingResponse(
+            BytesIO(file_content),
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'inline; filename="{document.original_filename}"',
+                "Cache-Control": "public, max-age=3600"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to retrieve document content: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve document content"
+        )
 
 
 @router.post("/{document_id}/schemas", response_model=DocumentSchemaAssignmentRead)
