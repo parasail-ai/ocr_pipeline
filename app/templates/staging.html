@@ -160,7 +160,17 @@
           <iframe id="document-preview" class="preview-frame" title="Document preview"></iframe>
         </div>
 
-        <!-- Processing Status -->
+        <!-- OCR Text Output -->
+        <div class="status-panel">
+          <h2 class="card-title">OCR Text Output</h2>
+          <div id="ocr-text-display" style="background: #f5f5f5; padding: 1rem; border-radius: 8px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 12px; line-height: 1.6;">
+            Waiting for OCR processing...
+          </div>
+        </div>
+      </div>
+
+      <!-- Processing Status -->
+      <div style="margin: 2rem 0;">
         <div class="status-panel">
           <h2 class="card-title">Processing Status</h2>
           <div id="status-list">
@@ -255,6 +265,26 @@
 
         // Update preview
         document.getElementById("document-preview").src = document.blob_url;
+
+        // Update OCR text display
+        const ocrTextDisplay = document.getElementById("ocr-text-display");
+        if (document.contents && document.contents.length > 0) {
+          // Show the OCR text - prefer parasail over docling
+          const parasailContent = document.contents.find(c => c.source === "parasail");
+          const doclingContent = document.contents.find(c => c.source === "docling");
+          const ocrContent = parasailContent || doclingContent;
+          
+          if (ocrContent && ocrContent.text) {
+            ocrTextDisplay.textContent = ocrContent.text;
+            ocrTextDisplay.style.color = "#333";
+          } else {
+            ocrTextDisplay.textContent = "Processing...";
+            ocrTextDisplay.style.color = "#999";
+          }
+        } else if (document.status === "processing") {
+          ocrTextDisplay.textContent = "OCR processing in progress...";
+          ocrTextDisplay.style.color = "#999";
+        }
 
         // Update status items
         updateStatus("upload", "complete", "Upload Complete", "Document stored in cloud");
