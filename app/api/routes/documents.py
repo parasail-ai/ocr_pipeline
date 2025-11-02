@@ -37,6 +37,7 @@ async def upload_document(
     file: UploadFile = File(...),
     model_name: str | None = Form(None),
     schema_id: str | None = Form(None),
+    preprocessing: str = Form("automatic"),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentRead:
     try:
@@ -92,7 +93,10 @@ async def upload_document(
             blob_path=blob_path,
             blob_url=blob_url,
             status="processing",
-            details={"content_type": file.content_type},
+            details={
+                "content_type": file.content_type,
+                "preprocessing": preprocessing
+            },
         )
         db.add(document)
         await db.flush()

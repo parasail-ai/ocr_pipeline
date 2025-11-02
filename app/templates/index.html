@@ -444,6 +444,13 @@
                             <option value="">Select a model...</option>
                         </select>
                     </div>
+                    
+                    <div class="form-field">
+                        <label for="preprocessingSelect">Pre-Processing</label>
+                        <select id="preprocessingSelect">
+                            <option value="automatic">Automatic</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="upload-actions">
@@ -504,7 +511,8 @@
             progressBar: document.getElementById('progressBar'),
             uploadStatus: document.getElementById('uploadStatus'),
             schemaSelect: document.getElementById('schemaSelect'),
-            modelSelect: document.getElementById('modelSelect')
+            modelSelect: document.getElementById('modelSelect'),
+            preprocessingSelect: document.getElementById('preprocessingSelect')
         };
 
         let selectedFile = null;
@@ -659,6 +667,7 @@
             clearFile();
             elements.schemaSelect.value = '';
             elements.modelSelect.value = '';
+            elements.preprocessingSelect.value = 'automatic';
         });
 
         // Form submit handler
@@ -684,6 +693,7 @@
             }
             
             formData.append('model_name', elements.modelSelect.value);
+            formData.append('preprocessing', elements.preprocessingSelect.value || 'automatic');
 
             try {
                 elements.uploadBtn.disabled = true;
