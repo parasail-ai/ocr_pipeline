@@ -177,6 +177,23 @@
         font-size: 14px;
         word-break: break-word;
       }
+      .spinner {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        margin-left: 8px;
+        border: 2px solid #ccc;
+        border-top-color: #1976d2;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .tab-btn .spinner {
+        vertical-align: middle;
+        margin-top: -2px;
+      }
     </style>
   </head>
   <body>
@@ -376,6 +393,38 @@
         }
       }
 
+      function updateTabSpinners() {
+        if (!docData) return;
+        
+        // Update OCR tab spinner
+        const ocrTab = document.getElementById('tab-btn-ocr');
+        const hasOCRContent = docData.contents && docData.contents.length > 0 && 
+                              docData.contents.some(c => c.text && c.text.length > 0);
+        updateTabSpinner(ocrTab, !hasOCRContent && docData.status !== 'processed');
+        
+        // Update Extracted Fields tab spinner
+        const fieldsTab = document.getElementById('tab-btn-fields');
+        const hasFields = docData.schemas && docData.schemas.length > 0 && 
+                          docData.schemas[0].extracted_values && 
+                          Object.keys(docData.schemas[0].extracted_values).length > 0;
+        updateTabSpinner(fieldsTab, !hasFields && docData.status !== 'processed');
+      }
+      
+      function updateTabSpinner(tabElement, showSpinner) {
+        // Remove existing spinner if any
+        const existingSpinner = tabElement.querySelector('.spinner');
+        if (existingSpinner) {
+          existingSpinner.remove();
+        }
+        
+        // Add spinner if needed
+        if (showSpinner) {
+          const spinner = document.createElement('span');
+          spinner.className = 'spinner';
+          tabElement.appendChild(spinner);
+        }
+      }
+
       function updateUI() {
         if (!docData) return;
 
@@ -383,6 +432,9 @@
 
         // Update document name
         document.getElementById("document-name").textContent = docData.original_filename;
+        
+        // Update tab spinners
+        updateTabSpinners();
 
         // Update preview - use the content endpoint instead of blob_url
         const previewIframe = document.getElementById("document-preview");

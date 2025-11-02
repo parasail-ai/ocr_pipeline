@@ -72,26 +72,12 @@ async def process_document_task(
 
     docling_extraction: dict[str, Any] | None = None
     docling_text: str | None = None
-
-    try:
-        processor = DoclingProcessor()
-    except DoclingUnavailable:
-        logger.info("Docling not available. Skipping structured extraction for %s", document_id)
-    except Exception as exc:  # pragma: no cover
-        logger.exception("Unexpected Docling initialization error", exc_info=exc)
-    else:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(blob_path).suffix) as tmp_file:
-            tmp_file.write(file_bytes)
-            temp_path = Path(tmp_file.name)
-
-        try:
-            docling_extraction = await asyncio.to_thread(processor.extract_document_structure, temp_path)
-            docling_text = _derive_docling_text(docling_extraction)
-        except Exception as exc:  # pragma: no cover - docling failure
-            logger.exception("Docling failed for document %s", document_id, exc_info=exc)
-        finally:
-            temp_path.unlink(missing_ok=True)
-
+    
+    # Only use Docling if no model is specified (disabled by default)
+    # Users must select a Parasail model for OCR processing
+    if not model_name:
+        logger.info("No OCR model selected. Docling processing is disabled by default. Please select a model.")
+    
     parasail_response: dict[str, Any] | None = None
     parasail_text: str | None = None
 

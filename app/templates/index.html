@@ -368,7 +368,7 @@
                     <div class="form-field">
                         <label for="modelSelect">OCR Model</label>
                         <select id="modelSelect">
-                            <option value="">Default (Docling only)</option>
+                            <option value="">Select a model...</option>
                         </select>
                     </div>
                 </div>
@@ -567,6 +567,12 @@
                 showStatus('Please select a file first', 'error');
                 return;
             }
+            
+            // Require model selection
+            if (!elements.modelSelect.value) {
+                showStatus('Please select an OCR model before uploading', 'error');
+                return;
+            }
 
             const formData = new FormData();
             formData.append('file', selectedFile);
@@ -575,9 +581,7 @@
                 formData.append('schema_id', elements.schemaSelect.value);
             }
             
-            if (elements.modelSelect.value) {
-                formData.append('model_name', elements.modelSelect.value);
-            }
+            formData.append('model_name', elements.modelSelect.value);
 
             try {
                 elements.uploadBtn.disabled = true;
