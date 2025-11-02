@@ -659,12 +659,22 @@
         const statusText = document.getElementById('status-text');
         const progressBar = document.getElementById('progress-bar');
         
+        // Only hide if document is fully processed
         if (docData.status === 'processed') {
           statusDiv.style.display = 'none';
           return;
         }
         
-        statusDiv.style.display = 'block';
+        // Show progress bar for any processing status
+        const isProcessing = ['uploaded', 'downloading', 'downloaded', 'ocr_processing', 'processing'].includes(docData.status);
+        
+        if (isProcessing) {
+          statusDiv.style.display = 'block';
+        } else {
+          // Hide for error states
+          statusDiv.style.display = 'none';
+          return;
+        }
         
         // Determine status and progress based on document state
         let progress = 10;
@@ -673,25 +683,34 @@
         if (docData.status === 'uploaded') {
           progress = 20;
           message = 'Document uploaded, queued for processing...';
+        } else if (docData.status === 'downloading') {
+          progress = 25;
+          message = 'Downloading document...';
+        } else if (docData.status === 'downloaded') {
+          progress = 28;
+          message = 'Preparing for OCR...';
+        } else if (docData.status === 'ocr_processing') {
+          progress = 40;
+          message = 'Running OCR extraction...';
         } else if (docData.status === 'processing') {
-          // Check what's been completed
+          // Check what's been completed for more granular progress
           const hasContents = docData.contents && docData.contents.length > 0;
           const hasExtractions = docData.extractions && docData.extractions.length > 0;
           const hasClassifications = docData.classifications && docData.classifications.length > 0;
           const hasSchemas = docData.schemas && docData.schemas.length > 0;
           
           if (!hasContents) {
-            progress = 30;
-            message = 'Running OCR extraction...';
-          } else if (!hasExtractions) {
             progress = 50;
+            message = 'Extracting text...';
+          } else if (!hasExtractions) {
+            progress = 65;
             message = 'Extracting tables and data...';
           } else if (!hasClassifications) {
-            progress = 70;
+            progress = 80;
             message = 'Classifying document...';
           } else if (!hasSchemas) {
-            progress = 85;
-            message = 'Generating schema...';
+            progress = 90;
+            message = 'Processing fields...';
           } else {
             progress = 95;
             message = 'Finalizing...';
