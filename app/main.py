@@ -151,13 +151,21 @@ async def models_page(
 
 
 @app.get("/analytics", response_class=HTMLResponse)
-async def analytics_page(request: Request) -> HTMLResponse:
-    """Analytics dashboard page"""
+async def analytics_page(
+    request: Request,
+    session_token: Optional[str] = Cookie(None)
+) -> HTMLResponse:
+    """Analytics dashboard page (admin only)"""
+    # Check if user is admin
+    if not AuthService.is_admin(session_token):
+        return RedirectResponse(url="/login?return=/analytics", status_code=status.HTTP_303_SEE_OTHER)
+    
     return templates.TemplateResponse(
         "analytics.html",
         {
             "request": request,
             "app_name": settings.app_name,
+            "is_admin": True,
         },
     )
 

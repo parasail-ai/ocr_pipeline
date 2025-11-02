@@ -20,6 +20,8 @@ class Folder(Base):
         UUID(as_uuid=True), ForeignKey("folders.id", ondelete="CASCADE"), nullable=True
     )
     path: Mapped[str] = mapped_column(String(2048), nullable=False)  # Full path for quick lookups
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False)  # System folders like trash
+    is_trash: Mapped[bool] = mapped_column(Boolean, default=False)  # Mark as trash folder
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

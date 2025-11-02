@@ -17,8 +17,9 @@ router = APIRouter(prefix="/analytics", tags=["Analytics"])
 async def get_analytics_overview(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     """Get analytics overview with key metrics."""
     
-    # Calculate date 30 days ago
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    try:
+        # Calculate date 30 days ago
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
     
     # Requests per day for last 30 days
     requests_per_day_query = (
@@ -124,11 +125,23 @@ async def get_analytics_overview(db: AsyncSession = Depends(get_db)) -> dict[str
     )
     unique_ips_count = await db.scalar(unique_ips_query) or 0
     
-    return {
-        "requests_per_day": requests_per_day,
-        "model_usage_counts": model_usage_counts,
-        "tokens_per_model": tokens_per_model,
-        "performance_per_model": performance_per_model,
-        "ip_addresses": ip_addresses,
-        "unique_ips_count": unique_ips_count,
-    }
+        return {
+            "requests_per_day": requests_per_day,
+            "model_usage_counts": model_usage_counts,
+            "tokens_per_model": tokens_per_model,
+            "performance_per_model": performance_per_model,
+            "ip_addresses": ip_addresses,
+            "unique_ips_count": unique_ips_count,
+        }
+    except Exception as e:
+        logger.exception("Error fetching analytics data", exc_info=e)
+        # Return empty data structure if table doesn't exist or other error
+        return {
+            "requests_per_day": [],
+            "model_usage_counts": [],
+            "tokens_per_model": [],
+            "performance_per_model": [],
+            "ip_addresses": [],
+            "unique_ips_count": 0,
+            "error": "Analytics data unavailable. Database migration may be needed."
+        }
