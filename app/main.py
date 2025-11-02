@@ -99,15 +99,12 @@ async def documents_page(request: Request) -> HTMLResponse:
 
 @app.get("/schemas", response_class=HTMLResponse)
 async def schemas_page(request: Request) -> HTMLResponse:
-    """Schemas management page (coming soon)"""
+    """Schemas management page"""
     return templates.TemplateResponse(
-        "coming_soon.html",
+        "schemas.html",
         {
             "request": request,
-            "page_name": "schemas",
-            "page_title": "Schema Management",
-            "icon": "📋",
-            "description": "Define and manage reusable schemas for document data extraction. This feature is coming soon!",
+            "app_name": settings.app_name,
         },
     )
 

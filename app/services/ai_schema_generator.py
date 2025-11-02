@@ -14,18 +14,39 @@ settings = get_settings()
 class AISchemaGenerator:
     """Generate schemas using AI analysis of OCR text."""
     
-    def __init__(self):
-        """Initialize the AI schema generator."""
-        # Get API key from settings
-        api_key = getattr(settings, 'parasail_api_key', None)
+    def __init__(self, api_endpoint: str | None = None, model_name: str | None = None, api_key: str | None = None):
+        """Initialize the AI schema generator.
+        
+        Args:
+            api_endpoint: API endpoint URL (defaults to config or https://api.parasail.io/v1)
+            model_name: Model name (defaults to config or parasail-glm-46)
+            api_key: API key (defaults to config or settings)
+        """
+        # Try to get config from config module if not provided
+        if api_endpoint is None or model_name is None or api_key is None:
+            try:
+                from app.api.routes.config import get_ai_config
+                config = get_ai_config()
+                api_endpoint = api_endpoint or config.get("api_endpoint", "https://api.parasail.io/v1")
+                model_name = model_name or config.get("model_name", "parasail-glm-46")
+                api_key = api_key or config.get("api_key")
+            except Exception as e:
+                logger.warning(f"Could not load config from config module: {e}")
+                # Fall back to settings
+                api_endpoint = api_endpoint or "https://api.parasail.io/v1"
+                model_name = model_name or "parasail-glm-46"
+                if api_key is None:
+                    api_key = getattr(settings, 'parasail_api_key', None)
+        
         if not api_key:
-            raise RuntimeError("PARASAIL_API_KEY not configured in settings")
+            raise RuntimeError("PARASAIL_API_KEY not configured. Please configure it in the Schemas page or set PARASAIL_API_KEY environment variable.")
         
         self.client = OpenAI(
-            base_url="https://api.parasail.io/v1",
+            base_url=api_endpoint,
             api_key=api_key
         )
-        self.model = "parasail-glm-46"
+        self.model = model_name
+        logger.info(f"AISchemaGenerator initialized with endpoint={api_endpoint}, model={model_name}")
     
     def generate_schema_from_ocr(
         self,
