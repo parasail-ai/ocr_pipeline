@@ -10,6 +10,7 @@ class DocumentRead(BaseModel):
     original_filename: str
     selected_model: Optional[str]
     selected_schema_id: Optional[uuid.UUID]
+    folder_id: Optional[uuid.UUID] = None
     blob_path: str
     blob_url: str
     uploaded_at: datetime

@@ -1,918 +1,609 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ app_name }}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Flex:wght@400;600&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/static/css/main.css" />
-    <script type="module" src="https://esm.run/@material/web/all.js"></script>
-  </head>
-  <body>
-    <div class="app-shell">
-      <header class="header">
-        <h1 class="headline">Parasail OCR Pipeline</h1>
-        <div class="header-actions">
-          <md-text-button id="nav-documents">Documents</md-text-button>
-          <md-text-button id="toggle-history">View History</md-text-button>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload - OCR Pipeline</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .upload-hero {
+            text-align: center;
+            padding: 60px 20px 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .upload-hero h1 {
+            font-size: 48px;
+            margin: 0 0 16px 0;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color), #2196f3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .upload-hero p {
+            font-size: 18px;
+            color: #666;
+            margin: 0;
+        }
+        
+        .upload-section {
+            max-width: 600px;
+            margin: 0 auto 40px;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 12px;
+            padding: 48px 24px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            background: #fafafa;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background: #f5f9ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--primary-color);
+            background: #e3f2fd;
+            transform: scale(1.02);
+        }
+        
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        
+        .upload-text {
+            font-size: 18px;
+            color: #333;
+            margin: 0 0 8px 0;
+            font-weight: 500;
+        }
+        
+        .upload-hint {
+            font-size: 14px;
+            color: #999;
+            margin: 0;
+        }
+        
+        .file-info {
+            display: none;
+            margin-top: 20px;
+            padding: 16px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            text-align: left;
+        }
+        
+        .file-info.show {
+            display: block;
+        }
+        
+        .file-info-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .file-info-icon {
+            font-size: 32px;
+        }
+        
+        .file-info-details {
+            flex: 1;
+        }
+        
+        .file-info-name {
+            font-weight: 500;
+            margin: 0 0 4px 0;
+        }
+        
+        .file-info-size {
+            font-size: 13px;
+            color: #666;
+            margin: 0;
+        }
+        
+        .remove-file {
+            color: #d32f2f;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .remove-file:hover {
+            background: rgba(211, 47, 47, 0.1);
+        }
+        
+        .upload-options {
+            margin-top: 32px;
+            display: grid;
+            gap: 20px;
+        }
+        
+        .form-field {
+            text-align: left;
+        }
+        
+        .form-field label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .form-field select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        
+        .form-field select:hover {
+            border-color: var(--primary-color);
+        }
+        
+        .form-field select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(103, 58, 183, 0.1);
+        }
+        
+        .upload-actions {
+            margin-top: 32px;
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(103, 58, 183, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .progress-bar {
+            display: none;
+            margin-top: 20px;
+            height: 6px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .progress-bar.show {
+            display: block;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), #2196f3);
+            transition: width 0.3s;
+            animation: progress-animation 1.5s infinite;
+        }
+        
+        @keyframes progress-animation {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+        
+        .upload-status {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+        }
+        
+        .upload-status.show {
+            display: block;
+        }
+        
+        .upload-status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .upload-status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .upload-status.info {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        
+        .features-grid {
+            max-width: 1200px;
+            margin: 60px auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            padding: 0 20px;
+        }
+        
+        .feature-card {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        .feature-card h3 {
+            margin: 0 0 12px 0;
+            font-size: 20px;
+        }
+        
+        .feature-card p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo-icon">📄</span>
+            OCR Pipeline
         </div>
-      </header>
-
-      <section class="upload-card">
-        <h2 class="card-title">Upload Contract</h2>
-        <p>
-          Add a contract PDF to store it in Azure Blob Storage and kick off the OCR pipeline. You can track processing
-          status in the document list below.
-        </p>
-        <form id="upload-form">
-          <div class="file-input">
-            <md-filled-button type="button" id="file-picker">Select file</md-filled-button>
-            <span id="file-label">No file selected</span>
-          </div>
-          <input id="file-input" type="file" accept=".pdf,.png,.jpg,.jpeg" hidden />
-          <label class="select-label" for="upload-schema">
-            <span>Saved schema (optional)</span>
-            <select id="upload-schema" class="select-field">
-              <option value="">Auto-detect</option>
-            </select>
-          </label>
-          <label class="select-label" for="ocr-model">
-            <span>OCR model</span>
-            <select id="ocr-model" class="select-field">
-              <option value="">Docling only (skip Parasail OCR)</option>
-              <option value="parasail-matt-ocr-1-dots">parasail-matt-ocr-1-dots</option>
-              <option value="parasail-matt-ocr-2-deepseekocr">parasail-matt-ocr-2-deepseekocr</option>
-              <option value="parasail-mattc-ocr-4-lighton">parasail-mattc-ocr-4-lighton</option>
-            </select>
-          </label>
-          <div class="actions">
-            <md-filled-tonal-button type="submit">Upload</md-filled-tonal-button>
-            <md-outlined-button type="reset">Reset</md-outlined-button>
-          </div>
-        </form>
-        <md-linear-progress id="upload-progress" indeterminate hidden></md-linear-progress>
-        <p id="upload-status"></p>
-      </section>
-
-      <section class="documents-card">
-        <h2 class="card-title">Documents</h2>
-        <div id="documents-container" class="document-list">
-          <div class="schema-empty">No documents yet. Upload a contract to get started.</div>
+        <div class="nav-menu">
+            <a href="/" class="nav-link active">Upload</a>
+            <a href="/documents" class="nav-link">Documents</a>
+            <a href="/schemas" class="nav-link">Schemas</a>
+            <a href="/models" class="nav-link">Models</a>
+            <a href="/analytics" class="nav-link">Analytics</a>
         </div>
-      </section>
+    </nav>
 
-      <section class="history-card" id="history-card" hidden>
-        <h2 class="card-title">Document History</h2>
-        <div class="history-table-wrapper">
-          <table class="history-table" id="history-table">
-            <thead>
-              <tr>
-                <th>Filename</th>
-                <th>Detected Type</th>
-                <th>Schema</th>
-                <th>Status</th>
-                <th>Uploaded</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="document-detail-card" id="document-detail" hidden>
-        <h2 class="card-title">Document Detail</h2>
-        <div class="detail-grid">
-          <div class="preview-panel">
-            <iframe id="document-preview" title="Document preview" class="preview-frame"></iframe>
-          </div>
-          <div class="analysis-panel">
-            <div class="detail-header">
-              <div>
-                <p class="detail-filename" id="detail-filename"></p>
-                <p class="detail-meta" id="detail-meta"></p>
-              </div>
-              <span class="status-chip" id="detail-status"></span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Parasail model</span>
-              <span class="detail-value" id="detail-model">–</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Last processed</span>
-              <span class="detail-value" id="detail-processed">–</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Detected type</span>
-              <span class="detail-value" id="detail-detected-type">–</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Detection confidence</span>
-              <span class="detail-value" id="detail-detected-confidence">–</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Selected schema</span>
-              <span class="detail-value" id="detail-selected-schema">–</span>
-            </div>
-            <div class="detail-block">
-              <div class="block-header">
-                <h3>OCR Output</h3>
-                <button type="button" class="ghost-button" id="copy-ocr-text">Copy text</button>
-              </div>
-              <textarea id="ocr-text-output" class="text-output" readonly placeholder="OCR output will appear here once processing finishes."></textarea>
-            </div>
-            <div class="detail-block">
-              <h3>OCR Runs</h3>
-              <div id="ocr-results-list" class="ocr-results-list">
-                <p class="schema-empty">No Parasail OCR runs for this document yet.</p>
-              </div>
-            </div>
-            <div class="detail-block">
-              <h3>Applied Schemas</h3>
-              <div id="schema-assignment-list" class="schema-assignment-list">
-                <p class="schema-empty">No schemas have been applied yet.</p>
-              </div>
-            </div>
-            <div class="detail-block">
-              <h3>Classification Suggestions</h3>
-              <div id="classification-list" class="classification-list">
-                <p class="schema-empty">No classification suggestions yet.</p>
-              </div>
-            </div>
-          </div>
+    <div class="container">
+        <div class="upload-hero">
+            <h1>📄 Upload Document</h1>
+            <p>Process documents with AI-powered OCR and extract structured data</p>
         </div>
 
-        <div class="schema-apply" id="schema-apply">
-          <h3>Apply Schema</h3>
-          <p class="schema-apply-hint">Select a saved schema and map values from the OCR output.</p>
-          <p class="schema-suggestion" id="schema-suggestion" hidden></p>
-          <div class="schema-apply-controls">
-            <label class="select-label" for="schema-select">
-              <span>Saved schema</span>
-              <select id="schema-select" class="select-field">
-                <option value="">Choose a schema</option>
-              </select>
-            </label>
-            <button type="button" class="ghost-button" id="refresh-schemas">Refresh</button>
-          </div>
-          <div id="schema-apply-fields" class="schema-apply-fields">
-            <p class="schema-empty">Select a schema to map values.</p>
-          </div>
-          <div class="actions">
-            <md-filled-button id="apply-schema-button" type="button">Apply Schema</md-filled-button>
-          </div>
+        <div class="upload-section">
+            <form id="uploadForm">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📎</div>
+                    <p class="upload-text">Drop your document here or click to browse</p>
+                    <p class="upload-hint">Supports PDF, PNG, JPG, JPEG (Max 50MB)</p>
+                </div>
+                
+                <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg" hidden>
+                
+                <div class="file-info" id="fileInfo">
+                    <div class="file-info-header">
+                        <div class="file-info-icon">📄</div>
+                        <div class="file-info-details">
+                            <p class="file-info-name" id="fileName"></p>
+                            <p class="file-info-size" id="fileSize"></p>
+                        </div>
+                        <span class="remove-file" id="removeFile">✕</span>
+                    </div>
+                </div>
+
+                <div class="upload-options">
+                    <div class="form-field">
+                        <label for="schemaSelect">Schema (Optional)</label>
+                        <select id="schemaSelect">
+                            <option value="">Auto-detect schema</option>
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="modelSelect">OCR Model</label>
+                        <select id="modelSelect">
+                            <option value="">Default (Docling only)</option>
+                            <option value="parasail-matt-ocr-2-deepseekocr">parasail-matt-ocr-2-deepseekocr</option>
+                            <option value="parasail-matt-ocr-1-dots">parasail-matt-ocr-1-dots</option>
+                            <option value="parasail-mattc-ocr-4-lighton">parasail-mattc-ocr-4-lighton</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="upload-actions">
+                    <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+                        Upload & Process
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="resetBtn">
+                        Clear
+                    </button>
+                </div>
+
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-bar-fill" style="width: 100%;"></div>
+                </div>
+
+                <div class="upload-status" id="uploadStatus"></div>
+            </form>
         </div>
-      </section>
 
-      <section class="schema-card">
-        <h2 class="card-title">Schema Builder</h2>
-        <p>
-          Define reusable key-value schemas for your contracts. Schemas will be stored in PostgreSQL and can be applied
-          to future uploads.
-        </p>
-        <form id="schema-form" class="schema-form">
-          <md-filled-text-field id="schema-name" label="Schema name" required></md-filled-text-field>
-          <md-filled-text-field id="schema-description" label="Description"></md-filled-text-field>
-
-          <div class="schema-fields" id="schema-fields">
-            <div class="schema-empty">No fields yet. Add your first field below.</div>
-          </div>
-
-          <div class="actions">
-            <md-outlined-button id="add-field" type="button">Add Field</md-outlined-button>
-            <md-filled-button type="submit">Save Schema</md-filled-button>
-          </div>
-        </form>
-      </section>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>AI-Powered OCR</h3>
+                <p>Extract text from documents using advanced Parasail AI models with high accuracy</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Auto Schema Detection</h3>
+                <p>Automatically detect document types and apply appropriate schemas for data extraction</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Real-time Processing</h3>
+                <p>Watch your documents process in real-time with live status updates</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">📁</div>
+                <h3>Organize Documents</h3>
+                <p>Manage documents with folders and tags for easy retrieval and organization</p>
+            </div>
+        </div>
     </div>
 
-    <template id="schema-field-template">
-      <div class="schema-field-group">
-        <md-filled-text-field label="Key" data-field="key" required></md-filled-text-field>
-        <md-filled-text-field label="Description" data-field="description"></md-filled-text-field>
-        <md-outlined-select label="Value Type" data-field="value_type">
-          <md-select-option selected value="string"><div slot="headline">String</div></md-select-option>
-          <md-select-option value="number"><div slot="headline">Number</div></md-select-option>
-          <md-select-option value="date"><div slot="headline">Date</div></md-select-option>
-          <md-select-option value="boolean"><div slot="headline">Boolean</div></md-select-option>
-        </md-outlined-select>
-        <md-switch data-field="required">
-          <div slot="label">Required field</div>
-        </md-switch>
-        <md-outlined-button type="button" data-action="remove">Remove</md-outlined-button>
-      </div>
-    </template>
-
-    <script type="module">
-      const state = {
-        documents: [],
-        schemas: [],
-        currentDocumentId: null,
-        currentDocument: null,
-        historyVisible: false,
-      };
-
-      const elements = {
-        fileInput: document.getElementById("file-input"),
-        fileLabel: document.getElementById("file-label"),
-        filePicker: document.getElementById("file-picker"),
-        uploadForm: document.getElementById("upload-form"),
-        uploadProgress: document.getElementById("upload-progress"),
-        uploadStatus: document.getElementById("upload-status"),
-        uploadSchema: document.getElementById("upload-schema"),
-        ocrModel: document.getElementById("ocr-model"),
-        documentsContainer: document.getElementById("documents-container"),
-        historyCard: document.getElementById("history-card"),
-        historyTableBody: document.querySelector("#history-table tbody"),
-        documentDetail: document.getElementById("document-detail"),
-        documentPreview: document.getElementById("document-preview"),
-        detailFilename: document.getElementById("detail-filename"),
-        detailMeta: document.getElementById("detail-meta"),
-        detailStatus: document.getElementById("detail-status"),
-        detailModel: document.getElementById("detail-model"),
-        detailProcessed: document.getElementById("detail-processed"),
-        detailDetectedType: document.getElementById("detail-detected-type"),
-        detailDetectedConfidence: document.getElementById("detail-detected-confidence"),
-        detailSelectedSchema: document.getElementById("detail-selected-schema"),
-        ocrTextOutput: document.getElementById("ocr-text-output"),
-        copyOcrTextButton: document.getElementById("copy-ocr-text"),
-        ocrResultsList: document.getElementById("ocr-results-list"),
-        schemaAssignmentList: document.getElementById("schema-assignment-list"),
-        classificationList: document.getElementById("classification-list"),
-        schemaApplyFields: document.getElementById("schema-apply-fields"),
-        schemaSelect: document.getElementById("schema-select"),
-        refreshSchemas: document.getElementById("refresh-schemas"),
-        applySchemaButton: document.getElementById("apply-schema-button"),
-        schemaForm: document.getElementById("schema-form"),
-        schemaFieldsContainer: document.getElementById("schema-fields"),
-        addFieldButton: document.getElementById("add-field"),
-        schemaFieldTemplate: document.getElementById("schema-field-template"),
-        schemaSuggestion: document.getElementById("schema-suggestion"),
-        toggleHistory: document.getElementById("toggle-history"),
-      };
-
-      elements.filePicker.addEventListener("click", () => elements.fileInput.click());
-      elements.fileInput.addEventListener("change", () => {
-        if (elements.fileInput.files.length) {
-          elements.fileLabel.textContent = elements.fileInput.files[0].name;
-        } else {
-          elements.fileLabel.textContent = "No file selected";
-        }
-      });
-
-      elements.uploadForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        if (!elements.fileInput.files.length) {
-          elements.uploadStatus.textContent = "Please select a file first.";
-          return;
-        }
-
-        elements.uploadProgress.hidden = false;
-        elements.uploadStatus.textContent = "Uploading...";
-
-        try {
-          const formData = new FormData();
-          formData.append("file", elements.fileInput.files[0]);
-          if (elements.ocrModel.value) {
-            formData.append("model_name", elements.ocrModel.value);
-          }
-          if (elements.uploadSchema.value) {
-            formData.append("schema_id", elements.uploadSchema.value);
-          }
-
-          const response = await fetch("/api/documents", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            const message = data.detail || "Upload failed";
-            throw new Error(message);
-          }
-
-          const document = await response.json();
-          elements.uploadStatus.textContent = "Upload complete. Redirecting to processing page...";
-          
-          // Redirect to staging page
-          setTimeout(() => {
-            window.location.href = `/staging/${document.id}`;
-          }, 500);
-        } catch (error) {
-          elements.uploadStatus.textContent = `Upload error: ${error.message}`;
-        } finally {
-          elements.uploadProgress.hidden = true;
-        }
-      });
-
-      elements.uploadForm.addEventListener("reset", () => {
-        elements.fileLabel.textContent = "No file selected";
-        elements.uploadStatus.textContent = "";
-      });
-
-      elements.toggleHistory.addEventListener("click", () => {
-        state.historyVisible = !state.historyVisible;
-        elements.historyCard.hidden = !state.historyVisible;
-        elements.toggleHistory.textContent = state.historyVisible ? "Hide History" : "View History";
-      });
-
-      document.getElementById("nav-documents").addEventListener("click", () => {
-        document.querySelector(".documents-card").scrollIntoView({ behavior: "smooth" });
-      });
-
-      elements.copyOcrTextButton.addEventListener("click", async () => {
-        const text = elements.ocrTextOutput.value;
-        if (!text) return;
-        try {
-          await navigator.clipboard.writeText(text);
-          elements.copyOcrTextButton.textContent = "Copied!";
-          setTimeout(() => (elements.copyOcrTextButton.textContent = "Copy text"), 1500);
-        } catch (error) {
-          console.error(error);
-        }
-      });
-
-      elements.refreshSchemas.addEventListener("click", () => fetchSchemas(true));
-      elements.schemaSelect.addEventListener("change", () => {
-        const selectedId = elements.schemaSelect.value;
-        const schema = state.schemas.find((item) => item.id === selectedId);
-        if (!state.currentDocument) {
-          renderSchemaApplyFields(null);
-          return;
-        }
-        const existing = state.currentDocument.schemas?.find((item) => item.schema_id === selectedId);
-        renderSchemaApplyFields(schema ?? null, state.currentDocument, existing?.extracted_values ?? {});
-      });
-
-      elements.applySchemaButton.addEventListener("click", async () => {
-        if (!state.currentDocumentId) {
-          alert("Select a document first.");
-          return;
-        }
-        const schemaId = elements.schemaSelect.value;
-        if (!schemaId) {
-          alert("Choose a schema before applying it.");
-          return;
-        }
-
-        const fields = elements.schemaApplyFields.querySelectorAll("[data-field-key]");
-        if (!fields.length) {
-          alert("Add schema fields or select a different schema.");
-          return;
-        }
-
-        const values = {};
-        fields.forEach((field) => {
-          if (field.type === "checkbox") {
-            values[field.dataset.fieldKey] = field.checked;
-          } else {
-            values[field.dataset.fieldKey] = field.value;
-          }
-        });
-
-        try {
-          const response = await fetch(`/api/documents/${state.currentDocumentId}/schemas`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ schema_id: schemaId, values }),
-          });
-
-          if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error(data.detail ?? "Could not apply schema");
-          }
-
-          await selectDocument(state.currentDocumentId);
-        } catch (error) {
-          alert(error.message);
-        }
-      });
-
-      elements.addFieldButton.addEventListener("click", () => {
-        const content = elements.schemaFieldTemplate.content.cloneNode(true);
-        const group = content.querySelector(".schema-field-group");
-        const removeButton = group.querySelector('[data-action="remove"]');
-        removeButton.addEventListener("click", () => {
-          group.remove();
-          if (!elements.schemaFieldsContainer.querySelector(".schema-field-group")) {
-            elements.schemaFieldsContainer.innerHTML =
-              '<div class="schema-empty">No fields yet. Add your first field below.</div>';
-          }
-        });
-        const emptyState = elements.schemaFieldsContainer.querySelector(".schema-empty");
-        if (emptyState) emptyState.remove();
-        elements.schemaFieldsContainer.appendChild(group);
-      });
-
-      elements.schemaForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-
-        const fields = Array.from(elements.schemaFieldsContainer.querySelectorAll(".schema-field-group")).map(
-          (group) => ({
-            key: group.querySelector('[data-field="key"]').value,
-            description: group.querySelector('[data-field="description"]').value,
-            value_type: group.querySelector('[data-field="value_type"]').value,
-            required: group.querySelector('[data-field="required"]').selected,
-          }),
-        );
-
-        const payload = {
-          name: document.getElementById("schema-name").value,
-          description: document.getElementById("schema-description").value,
-          fields,
+    <script>
+        const elements = {
+            uploadArea: document.getElementById('uploadArea'),
+            fileInput: document.getElementById('fileInput'),
+            fileInfo: document.getElementById('fileInfo'),
+            fileName: document.getElementById('fileName'),
+            fileSize: document.getElementById('fileSize'),
+            removeFile: document.getElementById('removeFile'),
+            uploadForm: document.getElementById('uploadForm'),
+            uploadBtn: document.getElementById('uploadBtn'),
+            resetBtn: document.getElementById('resetBtn'),
+            progressBar: document.getElementById('progressBar'),
+            uploadStatus: document.getElementById('uploadStatus'),
+            schemaSelect: document.getElementById('schemaSelect'),
+            modelSelect: document.getElementById('modelSelect')
         };
 
-        try {
-          const response = await fetch("/api/schemas", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+        let selectedFile = null;
 
-          if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error(data.detail ?? "Could not save schema");
-          }
-          elements.schemaForm.reset();
-          elements.schemaFieldsContainer.innerHTML =
-            '<div class="schema-empty">No fields yet. Add your first field below.</div>';
-          await fetchSchemas(true);
-        } catch (error) {
-          alert(error.message);
-        }
-      });
-
-      async function listDocuments() {
-        try {
-          const response = await fetch("/api/documents");
-          if (!response.ok) throw new Error("Unable to load documents");
-
-          const data = await response.json();
-          state.documents = data.items ?? [];
-          renderDocumentList();
-          renderHistoryTable();
-
-          if (!state.documents.length) {
-            state.currentDocumentId = null;
-            state.currentDocument = null;
-            elements.documentDetail.hidden = true;
-            return;
-          }
-
-          if (state.currentDocumentId) {
-            const stillExists = state.documents.some((item) => item.id === state.currentDocumentId);
-            if (!stillExists) {
-              state.currentDocumentId = null;
-              state.currentDocument = null;
-              elements.documentDetail.hidden = true;
+        // Load schemas
+        async function loadSchemas() {
+            try {
+                const response = await fetch('/api/schemas');
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                const schemas = data.items || [];
+                
+                schemas.forEach(schema => {
+                    const option = document.createElement('option');
+                    option.value = schema.id;
+                    option.textContent = schema.name;
+                    elements.schemaSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading schemas:', error);
             }
-          }
-
-          if (!state.currentDocumentId && state.documents.length) {
-            await selectDocument(state.documents[0].id);
-          }
-        } catch (error) {
-          console.error(error);
-        }
-      }
-
-      function renderDocumentList() {
-        const container = elements.documentsContainer;
-        container.innerHTML = "";
-
-        if (!state.documents.length) {
-          container.innerHTML =
-            '<div class="schema-empty">No documents yet. Upload a contract to get started.</div>';
-          return;
         }
 
-        state.documents.forEach((doc) => {
-          const item = document.createElement("div");
-          item.className = `document-item${doc.id === state.currentDocumentId ? " active" : ""}`;
-          item.setAttribute("role", "button");
-          item.tabIndex = 0;
-          item.innerHTML = `
-            <div>
-              <div class="document-name">${doc.original_filename}</div>
-              <div class="document-meta">${formatDate(doc.uploaded_at)}</div>
-              <div class="document-meta">Model: ${doc.selected_model || "Docling only"}</div>
-            </div>
-            <div class="actions">
-              <span class="status-chip">${doc.status}</span>
-              <md-text-button href="${doc.blob_url}" target="_blank">Open</md-text-button>
-              <md-text-button data-delete-id="${doc.id}">Delete</md-text-button>
-            </div>
-          `;
-          
-          // Add delete handler
-          const deleteButton = item.querySelector('[data-delete-id]');
-          deleteButton.addEventListener("click", async (e) => {
+        // Upload area click handler
+        elements.uploadArea.addEventListener('click', () => {
+            elements.fileInput.click();
+        });
+
+        // File input change handler
+        elements.fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleFileSelect(file);
+            }
+        });
+
+        // Drag and drop handlers
+        elements.uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            elements.uploadArea.classList.add('dragover');
+        });
+
+        elements.uploadArea.addEventListener('dragleave', () => {
+            elements.uploadArea.classList.remove('dragover');
+        });
+
+        elements.uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            elements.uploadArea.classList.remove('dragover');
+            
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                handleFileSelect(file);
+            }
+        });
+
+        // Handle file selection
+        function handleFileSelect(file) {
+            // Validate file type
+            const validTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+            if (!validTypes.includes(file.type)) {
+                showStatus('Please select a PDF or image file (PNG, JPG, JPEG)', 'error');
+                return;
+            }
+
+            // Validate file size (50MB)
+            if (file.size > 50 * 1024 * 1024) {
+                showStatus('File size must be less than 50MB', 'error');
+                return;
+            }
+
+            selectedFile = file;
+            elements.fileName.textContent = file.name;
+            elements.fileSize.textContent = formatFileSize(file.size);
+            elements.fileInfo.classList.add('show');
+            elements.uploadBtn.disabled = false;
+            hideStatus();
+        }
+
+        // Remove file handler
+        elements.removeFile.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (confirm(`Delete "${doc.original_filename}"? This cannot be undone.`)) {
-              await deleteDocument(doc.id);
+            clearFile();
+        });
+
+        // Clear file
+        function clearFile() {
+            selectedFile = null;
+            elements.fileInput.value = '';
+            elements.fileInfo.classList.remove('show');
+            elements.uploadBtn.disabled = true;
+            hideStatus();
+        }
+
+        // Reset button handler
+        elements.resetBtn.addEventListener('click', () => {
+            clearFile();
+            elements.schemaSelect.value = '';
+            elements.modelSelect.value = '';
+        });
+
+        // Form submit handler
+        elements.uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!selectedFile) {
+                showStatus('Please select a file first', 'error');
+                return;
             }
-          });
-          item.addEventListener("click", () => selectDocument(doc.id));
-          item.addEventListener("keypress", (event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              selectDocument(doc.id);
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            if (elements.schemaSelect.value) {
+                formData.append('schema_id', elements.schemaSelect.value);
             }
-          });
-          container.appendChild(item);
-        });
-      }
+            
+            if (elements.modelSelect.value) {
+                formData.append('model_name', elements.modelSelect.value);
+            }
 
-      async function selectDocument(documentId) {
-        try {
-          const response = await fetch(`/api/documents/${documentId}`);
-          if (!response.ok) throw new Error("Document not found");
+            try {
+                elements.uploadBtn.disabled = true;
+                elements.progressBar.classList.add('show');
+                showStatus('Uploading document...', 'info');
 
-          const document = await response.json();
-          state.currentDocumentId = document.id;
-          state.currentDocument = document;
+                const response = await fetch('/api/documents', {
+                    method: 'POST',
+                    body: formData
+                });
 
-          renderDocumentDetail(document);
-          renderDocumentList();
-        } catch (error) {
-          console.error(error);
-        }
-      }
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.detail || 'Upload failed');
+                }
 
-      function renderDocumentDetail(doc) {
-        if (!doc) return;
-        elements.documentDetail.hidden = false;
+                const document = await response.json();
+                showStatus('Upload complete! Redirecting...', 'success');
+                
+                // Redirect to staging page after brief delay
+                setTimeout(() => {
+                    window.location.href = `/staging/${document.id}`;
+                }, 800);
 
-        elements.documentPreview.src = doc.blob_url;
-        elements.detailFilename.textContent = doc.original_filename;
-        elements.detailMeta.textContent = `${formatDate(doc.uploaded_at)} · ${doc.details?.content_type ?? "Unknown type"}`;
-        elements.detailStatus.textContent = doc.status;
-        elements.detailModel.textContent = doc.selected_model || "Docling only";
-        elements.detailProcessed.textContent = doc.last_processed_at
-          ? formatDate(doc.last_processed_at)
-          : "Processing";
-        elements.detailDetectedType.textContent = doc.detected_type || "–";
-        elements.detailDetectedConfidence.textContent = doc.detected_confidence
-          ? `${Math.round(doc.detected_confidence * 100)}%`
-          : "–";
-        elements.detailSelectedSchema.textContent = doc.selected_schema?.name || "–";
-
-        const baseText = deriveBaseText(doc);
-        elements.ocrTextOutput.value = baseText || "";
-        elements.ocrTextOutput.placeholder = baseText
-          ? ""
-          : "OCR output will appear here once processing finishes.";
-
-        renderOcrResults(doc.ocr_results ?? []);
-        renderSchemaAssignments(doc.schemas ?? []);
-        renderClassifications(doc.classifications ?? []);
-
-        const selectedId = elements.schemaSelect.value;
-        const schema = state.schemas.find((item) => item.id === selectedId);
-        const existing = doc.schemas?.find((item) => item.schema_id === selectedId);
-        if (schema) {
-          renderSchemaApplyFields(schema, doc, existing?.extracted_values ?? {});
-        } else {
-          renderSchemaApplyFields(null);
-        }
-
-        if (!elements.schemaSelect.value) {
-          autoSelectSuggestedSchema(doc);
-        }
-      }
-
-      function renderOcrResults(results) {
-        const list = elements.ocrResultsList;
-        list.innerHTML = "";
-
-        if (!results.length) {
-          list.innerHTML = '<p class="schema-empty">No Parasail OCR runs for this document yet.</p>';
-          return;
-        }
-
-        results.forEach((result) => {
-          const card = document.createElement("div");
-          card.className = "ocr-result-card";
-          const textPreview = (result.summary || result.extracted_text || "").trim();
-          const truncated = textPreview
-            ? textPreview.length > 280
-              ? `${textPreview.slice(0, 280)}…`
-              : textPreview
-            : "No extracted text captured.";
-          card.innerHTML = `
-            <div class="result-header">
-              <div>
-                <strong>${result.model_name}</strong>
-                <span>${formatDate(result.created_at)}</span>
-              </div>
-            </div>
-            <p class="result-preview">${escapeHtml(truncated)}</p>
-          `;
-          list.appendChild(card);
-        });
-      }
-
-      function renderSchemaAssignments(assignments) {
-        const list = elements.schemaAssignmentList;
-        list.innerHTML = "";
-
-        if (!assignments.length) {
-          list.innerHTML = '<p class="schema-empty">No schemas have been applied yet.</p>';
-          return;
-        }
-
-        assignments.forEach((assignment) => {
-          const card = document.createElement("div");
-          card.className = "schema-assignment-card";
-          const name = assignment.schema?.name ?? "Schema";
-          card.innerHTML = `
-            <div class="assignment-header">
-              <div>
-                <strong>${name}</strong>
-                <span>${formatDate(assignment.created_at)}</span>
-              </div>
-              <button type="button" class="ghost-button" data-schema-id="${assignment.schema_id}">Load values</button>
-            </div>
-            <pre class="assignment-values">${escapeHtml(JSON.stringify(assignment.extracted_values, null, 2))}</pre>
-          `;
-
-          const loadButton = card.querySelector("button");
-          loadButton.addEventListener("click", () => {
-            elements.schemaSelect.value = assignment.schema_id;
-            const schema = state.schemas.find((item) => item.id === assignment.schema_id);
-            renderSchemaApplyFields(schema ?? null, state.currentDocument, assignment.extracted_values ?? {});
-          });
-
-          list.appendChild(card);
-        });
-      }
-
-      function renderClassifications(items) {
-        const container = elements.classificationList;
-        container.innerHTML = "";
-
-        if (!items.length) {
-          container.innerHTML = '<p class="schema-empty">No classification suggestions yet.</p>';
-          elements.schemaSuggestion.hidden = true;
-          elements.schemaSuggestion.textContent = "";
-          return;
-        }
-
-        items.forEach((item) => {
-          const card = document.createElement("div");
-          card.className = "classification-card";
-          const confidence =
-            item.confidence !== null && item.confidence !== undefined
-              ? `${Math.round(item.confidence * 100)}%`
-              : "–";
-          card.innerHTML = `
-            <div class="classification-header">
-              <strong>${item.label}</strong>
-              <span>${confidence}</span>
-            </div>
-            <div class="classification-body">
-              <p>${escapeHtml(item.rationale || "No rationale provided.")}</p>
-              ${item.extra?.suggested_fields ? `<p class="classification-fields"><strong>Suggested fields:</strong> ${escapeHtml(item.extra.suggested_fields.join(', '))}</p>` : ""}
-              ${item.suggested_schema_id ? `<p class="classification-schema">Suggested schema ID: ${item.suggested_schema_id}</p>` : ""}
-            </div>
-          `;
-          container.appendChild(card);
+            } catch (error) {
+                console.error('Upload error:', error);
+                showStatus(`Upload failed: ${error.message}`, 'error');
+                elements.uploadBtn.disabled = false;
+            } finally {
+                elements.progressBar.classList.remove('show');
+            }
         });
 
-        const primary = items[0];
-        if (primary && (primary.label !== "unknown" || primary.suggested_schema_id)) {
-          const fields = Array.isArray(primary.extra?.suggested_fields)
-            ? primary.extra.suggested_fields.join(", ")
-            : "";
-          elements.schemaSuggestion.textContent = `Suggested type: ${primary.label} (${Math.round(
-            (primary.confidence || 0) * 100,
-          )}%)${fields ? ` • Fields: ${fields}` : ""}`;
-          elements.schemaSuggestion.hidden = false;
-        } else {
-          elements.schemaSuggestion.hidden = true;
-          elements.schemaSuggestion.textContent = "";
-        }
-      }
-
-      function renderSchemaApplyFields(schema, doc = null, existingValues = {}) {
-        const container = elements.schemaApplyFields;
-        container.innerHTML = "";
-
-        if (!schema) {
-          container.innerHTML = '<p class="schema-empty">Select a schema to map values.</p>';
-          return;
+        // Show status message
+        function showStatus(message, type) {
+            elements.uploadStatus.textContent = message;
+            elements.uploadStatus.className = 'upload-status show ' + type;
         }
 
-        const baseText = doc ? deriveBaseText(doc) : "";
-
-        schema.fields.forEach((field) => {
-          const row = document.createElement("div");
-          row.className = "schema-apply-field";
-
-          const label = document.createElement("label");
-          label.className = "schema-apply-label";
-          label.textContent = field.key;
-          row.appendChild(label);
-
-          if (field.description) {
-            const description = document.createElement("span");
-            description.className = "schema-field-help";
-            description.textContent = field.description;
-            row.appendChild(description);
-          }
-
-          let input;
-          if (Array.isArray(field.options) && field.options.length) {
-            input = document.createElement("select");
-            input.className = "schema-field-input";
-            input.dataset.fieldKey = field.key;
-            input.appendChild(new Option("Select", "", false, !existingValues[field.key]));
-            field.options.forEach((option) => {
-              input.appendChild(new Option(option, option, false, existingValues[field.key] === option));
-            });
-          } else if (field.value_type === "boolean") {
-            input = document.createElement("select");
-            input.className = "schema-field-input";
-            input.dataset.fieldKey = field.key;
-            input.appendChild(new Option("Select", "", false, existingValues[field.key] === undefined));
-            input.appendChild(new Option("True", "true", false, existingValues[field.key] === true || existingValues[field.key] === "true"));
-            input.appendChild(new Option("False", "false", false, existingValues[field.key] === false || existingValues[field.key] === "false"));
-          } else if (field.value_type === "number") {
-            input = document.createElement("input");
-            input.type = "number";
-            input.className = "schema-field-input";
-            input.dataset.fieldKey = field.key;
-            input.value = existingValues[field.key] ?? "";
-          } else {
-            const textarea = document.createElement("textarea");
-            textarea.className = "schema-field-input";
-            textarea.rows = 2;
-            textarea.dataset.fieldKey = field.key;
-            textarea.placeholder = baseText ? `Search OCR output for \"${field.key}\"` : "Enter value";
-            textarea.value = existingValues[field.key] ?? "";
-            input = textarea;
-          }
-
-          if (field.required) {
-            input.required = true;
-          }
-
-          row.appendChild(input);
-          container.appendChild(row);
-        });
-      }
-
-      async function fetchSchemas(force = false) {
-        if (!force && state.schemas.length) return;
-        try {
-          const response = await fetch("/api/schemas");
-          if (!response.ok) throw new Error("Unable to load schemas");
-
-          const data = await response.json();
-          state.schemas = data.items ?? [];
-          populateSchemaSelect();
-        } catch (error) {
-          console.error(error);
-        }
-      }
-
-      function populateSchemaSelect() {
-        const select = elements.schemaSelect;
-        const currentValue = select.value;
-        select.innerHTML = '<option value="">Choose a schema</option>';
-        const uploadSelect = elements.uploadSchema;
-        const uploadValue = uploadSelect.value;
-        uploadSelect.innerHTML = '<option value="">Auto-detect</option>';
-        state.schemas.forEach((schema) => {
-          const option = document.createElement("option");
-          option.value = schema.id;
-          option.textContent = schema.name;
-          if (schema.id === currentValue) {
-            option.selected = true;
-          }
-          select.appendChild(option);
-
-          const uploadOption = option.cloneNode(true);
-          uploadOption.selected = schema.id === uploadValue;
-          uploadSelect.appendChild(uploadOption);
-        });
-
-        if (select.value) {
-          const schema = state.schemas.find((item) => item.id === select.value);
-          const existing = state.currentDocument?.schemas?.find((item) => item.schema_id === select.value);
-          renderSchemaApplyFields(schema ?? null, state.currentDocument, existing?.extracted_values ?? {});
-        } else {
-          renderSchemaApplyFields(null);
-        }
-      }
-
-      function deriveBaseText(doc) {
-        if (!doc?.details) return "";
-        const details = doc.details;
-        if (details.parasail?.text) return details.parasail.text;
-        if (details.docling_text) return details.docling_text;
-        if (details.docling?.text) return details.docling.text;
-        return "";
-      }
-
-      function formatDate(value) {
-        try {
-          return new Date(value).toLocaleString();
-        } catch (error) {
-          return value;
-        }
-      }
-
-      function escapeHtml(value) {
-        if (!value) return "";
-        return value
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#039;");
-      }
-
-      function renderHistoryTable() {
-        const tbody = elements.historyTableBody;
-        tbody.innerHTML = "";
-
-        if (!state.documents.length) {
-          const row = document.createElement("tr");
-          row.innerHTML = '<td colspan="5" class="history-empty">No documents yet.</td>';
-          tbody.appendChild(row);
-          return;
+        // Hide status message
+        function hideStatus() {
+            elements.uploadStatus.classList.remove('show');
         }
 
-        state.documents.forEach((doc) => {
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td>${doc.original_filename}</td>
-            <td>${doc.detected_type || "–"}</td>
-            <td>${doc.selected_schema?.name || "–"}</td>
-            <td>${doc.status}</td>
-            <td>${formatDate(doc.uploaded_at)}</td>
-          `;
-          row.addEventListener("click", () => selectDocument(doc.id));
-          tbody.appendChild(row);
-        });
-      }
-
-      function autoSelectSuggestedSchema(doc) {
-        if (!doc) return;
-        const selected = elements.schemaSelect.value;
-        if (selected) return;
-
-        if (doc.selected_schema_id) {
-          elements.schemaSelect.value = doc.selected_schema_id;
-          elements.uploadSchema.value = doc.selected_schema_id;
-          const existing = doc.schemas?.find((item) => item.schema_id === doc.selected_schema_id);
-          const schema = state.schemas.find((item) => item.id === doc.selected_schema_id);
-          if (schema) {
-            renderSchemaApplyFields(schema, doc, existing?.extracted_values ?? {});
-          }
-          return;
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
 
-        const suggestion = doc.classifications?.find((item) => item.suggested_schema_id);
-        if (suggestion) {
-          elements.schemaSelect.value = suggestion.suggested_schema_id;
-          elements.uploadSchema.value = suggestion.suggested_schema_id;
-          const schema = state.schemas.find((item) => item.id === suggestion.suggested_schema_id);
-          if (schema) {
-            renderSchemaApplyFields(schema, doc, {});
-          }
-        }
-      }
-
-      async function deleteDocument(documentId) {
-        try {
-          const response = await fetch(`/api/documents/${documentId}`, {
-            method: "DELETE",
-          });
-
-          if (!response.ok) {
-            throw new Error("Failed to delete document");
-          }
-
-          // Reload documents list
-          await listDocuments();
-        } catch (error) {
-          alert(`Error deleting document: ${error.message}`);
-          console.error(error);
-        }
-      }
-
-      async function bootstrap() {
-        await fetchSchemas(true);
-        await listDocuments();
-      }
-
-      bootstrap();
+        // Initialize
+        loadSchemas();
     </script>
-  </body>
+</body>
 </html>

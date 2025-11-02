@@ -10,6 +10,24 @@ class Base(DeclarativeBase):
     pass
 
 
+class Folder(Base):
+    """Folders for organizing documents"""
+    __tablename__ = "folders"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("folders.id", ondelete="CASCADE"), nullable=True
+    )
+    path: Mapped[str] = mapped_column(String(2048), nullable=False)  # Full path for quick lookups
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    parent: Mapped["Folder | None"] = relationship("Folder", remote_side=[id], foreign_keys=[parent_id], back_populates="children")
+    children: Mapped[list["Folder"]] = relationship("Folder", back_populates="parent", cascade="all, delete-orphan")
+    documents: Mapped[list["Document"]] = relationship(back_populates="folder")
+
+
 class Document(Base):
     __tablename__ = "documents"
 
@@ -18,6 +36,9 @@ class Document(Base):
     selected_model: Mapped[str | None] = mapped_column(String(150), nullable=True)
     selected_schema_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("schema_definitions.id", ondelete="SET NULL"), nullable=True
+    )
+    folder_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("folders.id", ondelete="SET NULL"), nullable=True
     )
     blob_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     blob_url: Mapped[str] = mapped_column(String(2048), nullable=False)
@@ -28,6 +49,7 @@ class Document(Base):
     detected_type: Mapped[str | None] = mapped_column(String(150), nullable=True)
     detected_confidence: Mapped[float | None] = mapped_column(nullable=True)
 
+    folder: Mapped["Folder | None"] = relationship(back_populates="documents")
     schemas: Mapped[list["DocumentSchema"]] = relationship(back_populates="document", cascade="all, delete-orphan")
     ocr_results: Mapped[list["DocumentOcrResult"]] = relationship(
         back_populates="document", cascade="all, delete-orphan", order_by="desc(DocumentOcrResult.created_at)"

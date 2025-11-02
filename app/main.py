@@ -89,7 +89,7 @@ async def staging(request: Request, document_id: str) -> HTMLResponse:
 async def documents_page(request: Request) -> HTMLResponse:
     """Documents management page"""
     return templates.TemplateResponse(
-        "index.html",  # Will create documents.html later
+        "documents.html",
         {
             "request": request,
             "app_name": settings.app_name,

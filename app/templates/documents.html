@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documents - OCR Pipeline</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .documents-container {
+            display: flex;
+            height: calc(100vh - 140px);
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .folder-sidebar {
+            width: 280px;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+        
+        .folder-sidebar h3 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .add-folder-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        
+        .add-folder-btn:hover {
+            background: var(--primary-dark);
+        }
+        
+        .folder-tree {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .folder-item {
+            padding: 10px;
+            margin: 4px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+        
+        .folder-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .folder-item.active {
+            background: #e3f2fd;
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+        
+        .folder-icon {
+            font-size: 18px;
+        }
+        
+        .folder-name {
+            flex: 1;
+        }
+        
+        .folder-count {
+            font-size: 12px;
+            color: #666;
+            background: #f0f0f0;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        
+        .documents-main {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+        
+        .documents-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .documents-header h2 {
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        .view-toggle {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .view-btn {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .view-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .documents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .documents-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .document-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .document-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .document-card-header {
+            display: flex;
+            align-items: start;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .document-icon {
+            font-size: 32px;
+            min-width: 40px;
+        }
+        
+        .document-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .document-name {
+            font-weight: 500;
+            font-size: 15px;
+            margin: 0 0 4px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .document-meta {
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .document-status {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #f0f0f0;
+        }
+        
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-badge.completed {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .status-badge.processing {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        
+        .status-badge.failed {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .document-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+        
+        .action-btn {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        .action-btn:hover {
+            background: #f5f5f5;
+        }
+        
+        .action-btn.delete {
+            color: #d32f2f;
+            border-color: #d32f2f;
+        }
+        
+        .action-btn.delete:hover {
+            background: #d32f2f;
+            color: white;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        
+        .empty-state h3 {
+            margin: 0 0 8px 0;
+            color: #666;
+        }
+        
+        .empty-state p {
+            margin: 0;
+        }
+        
+        /* List view specific styles */
+        .documents-list .document-card {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+        }
+        
+        .documents-list .document-card-header {
+            flex: 1;
+            margin-bottom: 0;
+        }
+        
+        .documents-list .document-status {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+            margin-left: auto;
+        }
+        
+        /* Search and filters */
+        .documents-filters {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .search-box {
+            flex: 1;
+            padding: 10px 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .filter-select {
+            padding: 10px 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+        
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        
+        .modal-header {
+            margin-bottom: 20px;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            font-size: 20px;
+        }
+        
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        
+        .modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .modal-btn.primary {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .modal-btn.primary:hover {
+            background: var(--primary-dark);
+        }
+        
+        .modal-btn.secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .modal-btn.secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo-icon">📄</span>
+            OCR Pipeline
+        </div>
+        <div class="nav-menu">
+            <a href="/" class="nav-link">Upload</a>
+            <a href="/documents" class="nav-link active">Documents</a>
+            <a href="/schemas" class="nav-link">Schemas</a>
+            <a href="/models" class="nav-link">Models</a>
+            <a href="/analytics" class="nav-link">Analytics</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="documents-container">
+            <!-- Folder Sidebar -->
+            <div class="folder-sidebar">
+                <h3>
+                    Folders
+                    <button class="add-folder-btn" onclick="showAddFolderModal()" title="Add Folder">+</button>
+                </h3>
+                <ul class="folder-tree" id="folderTree">
+                    <li class="folder-item active" data-folder-id="all">
+                        <span class="folder-icon">📁</span>
+                        <span class="folder-name">All Documents</span>
+                        <span class="folder-count" id="allCount">0</span>
+                    </li>
+                    <li class="folder-item" data-folder-id="uncategorized">
+                        <span class="folder-icon">📂</span>
+                        <span class="folder-name">Uncategorized</span>
+                        <span class="folder-count" id="uncategorizedCount">0</span>
+                    </li>
+                    <!-- Dynamic folders will be added here -->
+                </ul>
+            </div>
+
+            <!-- Documents Main Area -->
+            <div class="documents-main">
+                <div class="documents-header">
+                    <h2 id="folderTitle">All Documents</h2>
+                    <div class="view-toggle">
+                        <button class="view-btn active" onclick="setView('grid')" data-view="grid">
+                            <span>⊞ Grid</span>
+                        </button>
+                        <button class="view-btn" onclick="setView('list')" data-view="list">
+                            <span>☰ List</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="documents-filters">
+                    <input type="text" class="search-box" id="searchBox" placeholder="Search documents..." oninput="filterDocuments()">
+                    <select class="filter-select" id="statusFilter" onchange="filterDocuments()">
+                        <option value="">All Status</option>
+                        <option value="completed">Completed</option>
+                        <option value="processing">Processing</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                    <select class="filter-select" id="sortBy" onchange="filterDocuments()">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="name">Name (A-Z)</option>
+                    </select>
+                </div>
+
+                <div class="documents-grid" id="documentsContainer">
+                    <!-- Documents will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Folder Modal -->
+    <div class="modal" id="addFolderModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Folder</h3>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="folderName">Folder Name</label>
+                    <input type="text" id="folderName" placeholder="Enter folder name">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" onclick="hideAddFolderModal()">Cancel</button>
+                <button class="modal-btn primary" onclick="createFolder()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allDocuments = [];
+        let currentFolderId = 'all';
+        let currentView = 'grid';
+
+        // Load documents on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDocuments();
+            loadFolders();
+        });
+
+        async function loadDocuments() {
+            try {
+                const response = await fetch('/api/documents');
+                if (!response.ok) throw new Error('Failed to load documents');
+                
+                const documents = await response.json();
+                allDocuments = documents;
+                
+                updateFolderCounts();
+                renderDocuments();
+            } catch (error) {
+                console.error('Error loading documents:', error);
+                showError('Failed to load documents');
+            }
+        }
+
+        async function loadFolders() {
+            try {
+                const response = await fetch('/api/folders');
+                if (!response.ok) return; // Folders not yet implemented
+                
+                const folders = await response.json();
+                renderFolders(folders);
+            } catch (error) {
+                // Folders endpoint not yet implemented
+                console.log('Folders not yet available');
+            }
+        }
+
+        function renderFolders(folders) {
+            const folderTree = document.getElementById('folderTree');
+            const customFolders = folders.map(folder => `
+                <li class="folder-item" data-folder-id="${folder.id}">
+                    <span class="folder-icon">📁</span>
+                    <span class="folder-name">${escapeHtml(folder.name)}</span>
+                    <span class="folder-count">${folder.document_count || 0}</span>
+                </li>
+            `).join('');
+            
+            // Insert after the uncategorized folder
+            folderTree.innerHTML = `
+                <li class="folder-item active" data-folder-id="all">
+                    <span class="folder-icon">📁</span>
+                    <span class="folder-name">All Documents</span>
+                    <span class="folder-count" id="allCount">0</span>
+                </li>
+                <li class="folder-item" data-folder-id="uncategorized">
+                    <span class="folder-icon">📂</span>
+                    <span class="folder-name">Uncategorized</span>
+                    <span class="folder-count" id="uncategorizedCount">0</span>
+                </li>
+                ${customFolders}
+            `;
+            
+            // Add click handlers
+            document.querySelectorAll('.folder-item').forEach(item => {
+                item.addEventListener('click', () => selectFolder(item.dataset.folderId));
+            });
+        }
+
+        function updateFolderCounts() {
+            const totalCount = allDocuments.length;
+            const uncategorizedCount = allDocuments.filter(doc => !doc.folder_id).length;
+            
+            document.getElementById('allCount').textContent = totalCount;
+            document.getElementById('uncategorizedCount').textContent = uncategorizedCount;
+        }
+
+        function selectFolder(folderId) {
+            currentFolderId = folderId;
+            
+            // Update active state
+            document.querySelectorAll('.folder-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.folderId === folderId);
+            });
+            
+            // Update header
+            const folderItem = document.querySelector(`[data-folder-id="${folderId}"]`);
+            document.getElementById('folderTitle').textContent = 
+                folderItem ? folderItem.querySelector('.folder-name').textContent : 'All Documents';
+            
+            renderDocuments();
+        }
+
+        function renderDocuments() {
+            const container = document.getElementById('documentsContainer');
+            container.className = currentView === 'grid' ? 'documents-grid' : 'documents-list';
+            
+            let filteredDocs = filterDocumentsByFolder(allDocuments);
+            filteredDocs = applyFilters(filteredDocs);
+            
+            if (filteredDocs.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <h3>No documents found</h3>
+                        <p>Upload your first document to get started</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = filteredDocs.map(doc => createDocumentCard(doc)).join('');
+        }
+
+        function filterDocumentsByFolder(documents) {
+            if (currentFolderId === 'all') {
+                return documents;
+            } else if (currentFolderId === 'uncategorized') {
+                return documents.filter(doc => !doc.folder_id);
+            } else {
+                return documents.filter(doc => doc.folder_id === currentFolderId);
+            }
+        }
+
+        function applyFilters(documents) {
+            const searchTerm = document.getElementById('searchBox').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+            
+            let filtered = documents;
+            
+            // Search filter
+            if (searchTerm) {
+                filtered = filtered.filter(doc => 
+                    doc.filename.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            // Status filter
+            if (statusFilter) {
+                filtered = filtered.filter(doc => getDocumentStatus(doc) === statusFilter);
+            }
+            
+            // Sort
+            filtered = [...filtered].sort((a, b) => {
+                if (sortBy === 'newest') {
+                    return new Date(b.created_at) - new Date(a.created_at);
+                } else if (sortBy === 'oldest') {
+                    return new Date(a.created_at) - new Date(b.created_at);
+                } else if (sortBy === 'name') {
+                    return a.filename.localeCompare(b.filename);
+                }
+                return 0;
+            });
+            
+            return filtered;
+        }
+
+        function filterDocuments() {
+            renderDocuments();
+        }
+
+        function createDocumentCard(doc) {
+            const status = getDocumentStatus(doc);
+            const statusClass = status;
+            const statusText = status.charAt(0).toUpperCase() + status.slice(1);
+            const icon = getDocumentIcon(doc.filename);
+            const date = new Date(doc.created_at).toLocaleDateString();
+            
+            return `
+                <div class="document-card" onclick="openDocument('${doc.id}')">
+                    <div class="document-card-header">
+                        <div class="document-icon">${icon}</div>
+                        <div class="document-info">
+                            <h3 class="document-name" title="${escapeHtml(doc.filename)}">${escapeHtml(doc.filename)}</h3>
+                            <div class="document-meta">
+                                <div>Uploaded: ${date}</div>
+                                ${doc.file_size ? `<div>Size: ${formatFileSize(doc.file_size)}</div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="document-status">
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                        <div class="document-actions">
+                            <button class="action-btn" onclick="event.stopPropagation(); viewDocument('${doc.id}')">View</button>
+                            <button class="action-btn delete" onclick="event.stopPropagation(); deleteDocument('${doc.id}')">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getDocumentStatus(doc) {
+            if (doc.processing_status === 'completed') return 'completed';
+            if (doc.processing_status === 'failed') return 'failed';
+            return 'processing';
+        }
+
+        function getDocumentIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'pdf': '📕',
+                'doc': '📘',
+                'docx': '📘',
+                'txt': '📄',
+                'jpg': '🖼️',
+                'jpeg': '🖼️',
+                'png': '🖼️',
+                'gif': '🖼️'
+            };
+            return icons[ext] || '📄';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function openDocument(documentId) {
+            window.location.href = `/staging/${documentId}`;
+        }
+
+        function viewDocument(documentId) {
+            window.location.href = `/staging/${documentId}`;
+        }
+
+        async function deleteDocument(documentId) {
+            if (!confirm('Are you sure you want to delete this document?')) return;
+            
+            try {
+                const response = await fetch(`/api/documents/${documentId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) throw new Error('Failed to delete document');
+                
+                // Remove from local array
+                allDocuments = allDocuments.filter(doc => doc.id !== documentId);
+                updateFolderCounts();
+                renderDocuments();
+            } catch (error) {
+                console.error('Error deleting document:', error);
+                alert('Failed to delete document');
+            }
+        }
+
+        function setView(view) {
+            currentView = view;
+            
+            // Update button states
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === view);
+            });
+            
+            renderDocuments();
+        }
+
+        function showAddFolderModal() {
+            document.getElementById('addFolderModal').classList.add('show');
+            document.getElementById('folderName').value = '';
+            document.getElementById('folderName').focus();
+        }
+
+        function hideAddFolderModal() {
+            document.getElementById('addFolderModal').classList.remove('show');
+        }
+
+        async function createFolder() {
+            const name = document.getElementById('folderName').value.trim();
+            if (!name) {
+                alert('Please enter a folder name');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/folders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                
+                if (!response.ok) throw new Error('Failed to create folder');
+                
+                hideAddFolderModal();
+                loadFolders();
+            } catch (error) {
+                console.error('Error creating folder:', error);
+                alert('Failed to create folder. This feature is coming soon!');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showError(message) {
+            alert(message);
+        }
+    </script>
+</body>
+</html>
