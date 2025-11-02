@@ -102,7 +102,12 @@ async def upload_document(
         await db.flush()
         
         # Create metrics record
-        client_ip = request.client.host if request.client else None
+        # Get real client IP (behind Azure proxy/load balancer)
+        client_ip = (
+            request.headers.get("x-forwarded-for", "").split(",")[0].strip() or
+            request.headers.get("x-real-ip") or
+            (request.client.host if request.client else None)
+        )
         user_agent = request.headers.get("user-agent")
         
         metrics = DocumentMetrics(

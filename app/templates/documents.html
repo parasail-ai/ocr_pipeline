@@ -818,23 +818,24 @@
             // First filter by folder
             let filtered;
             if (currentFolderId === 'all') {
-                filtered = documents;
-            } else if (currentFolderId === 'uncategorized') {
-                filtered = documents.filter(doc => !doc.folder_id);
-            } else {
-                filtered = documents.filter(doc => doc.folder_id === currentFolderId);
-            }
-            
-            // Then filter out trash documents ONLY if not viewing trash folder and not admin
-            if (!isAdmin && trashFolderId && currentFolderId !== trashFolderId) {
-                const beforeCount = filtered.length;
-                filtered = filtered.filter(doc => {
+                // All Documents: exclude trash for everyone (admin and non-admin)
+                filtered = documents.filter(doc => {
+                    if (!trashFolderId) return true;
                     const docFolderId = doc.folder_id ? String(doc.folder_id) : null;
                     const trashId = String(trashFolderId);
-                    const isInTrash = docFolderId === trashId;
-                    return !isInTrash;
+                    return docFolderId !== trashId;
                 });
-                console.log(`Filtered out ${beforeCount - filtered.length} trash documents from non-trash view`);
+            } else if (currentFolderId === 'uncategorized') {
+                // Uncategorized: only docs with no folder_id
+                filtered = documents.filter(doc => !doc.folder_id);
+            } else {
+                // Specific folder (including trash): show only docs in that folder
+                filtered = documents.filter(doc => {
+                    const docFolderId = doc.folder_id ? String(doc.folder_id) : null;
+                    const selectedFolderId = String(currentFolderId);
+                    console.log('Comparing doc folder_id:', docFolderId, 'with currentFolderId:', selectedFolderId, 'match:', docFolderId === selectedFolderId);
+                    return docFolderId === selectedFolderId;
+                });
             }
             
             console.log(`Final filtered count: ${filtered.length}`);
