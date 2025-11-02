@@ -588,7 +588,7 @@
         });
 
         // Handle file selection
-        function handleFileSelect(file) {
+        async function handleFileSelect(file) {
             // Validate file type
             const validTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
             if (!validTypes.includes(file.type)) {
@@ -601,6 +601,19 @@
                 showStatus('File size must be less than 50MB', 'error');
                 return;
             }
+            
+            // Validate PDF page count (max 5 pages)
+            if (file.type === 'application/pdf') {
+                try {
+                    const pageCount = await getPDFPageCount(file);
+                    if (pageCount > 5) {
+                        showStatus('Sorry, no PDFs larger than 5 pages', 'error');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error checking PDF page count:', error);
+                }
+            }
 
             selectedFile = file;
             elements.fileName.textContent = file.name;
@@ -608,6 +621,22 @@
             elements.fileInfo.classList.add('show');
             elements.uploadBtn.disabled = false;
             hideStatus();
+        }
+        
+        // Get PDF page count
+        async function getPDFPageCount(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function() {
+                    const data = new Uint8Array(reader.result);
+                    // Count occurrences of "/Type /Page" in the PDF
+                    const text = String.fromCharCode.apply(null, data);
+                    const matches = text.match(/\/Type\s*\/Page[^s]/g);
+                    resolve(matches ? matches.length : 1);
+                };
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
         }
 
         // Remove file handler

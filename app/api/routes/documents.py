@@ -46,6 +46,18 @@ async def upload_document(
         file_bytes = await file.read()
         logger.info(f"Read {len(file_bytes)} bytes from uploaded file")
         
+        # Validate PDF page count (max 5 pages)
+        if file.content_type == 'application/pdf':
+            from app.services.pdf_splitter import PDFSplitterService
+            pdf_splitter = PDFSplitterService()
+            if pdf_splitter.is_pdf(file_bytes):
+                page_count = pdf_splitter.get_page_count(file_bytes)
+                if page_count > 5:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Sorry, no PDFs larger than 5 pages. This PDF has {page_count} pages."
+                    )
+        
         # Upload to blob storage
         blob_service = BlobStorageService()
         blob_path, blob_url = blob_service.upload_document(
