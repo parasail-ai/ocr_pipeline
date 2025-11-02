@@ -166,6 +166,20 @@ async def _store_ocr_result(
     summary: str | None,
 ) -> None:
     async with AsyncSessionLocal() as session:
+        # Extract timing information from response if available
+        timing = raw_response.get('_timing', {})
+        started_at = None
+        completed_at = None
+        duration_ms = None
+        
+        if timing:
+            from datetime import datetime
+            if timing.get('start_time'):
+                started_at = datetime.fromtimestamp(timing['start_time'])
+            if timing.get('end_time'):
+                completed_at = datetime.fromtimestamp(timing['end_time'])
+            duration_ms = timing.get('duration_ms')
+        
         record = DocumentOcrResult(
             document_id=document_id,
             model_name=model_name,
@@ -173,6 +187,15 @@ async def _store_ocr_result(
             extracted_text=extracted_text,
             summary=summary,
         )
+        
+        # Add timing fields if they exist in the model
+        if hasattr(record, 'started_at'):
+            record.started_at = started_at
+        if hasattr(record, 'completed_at'):
+            record.completed_at = completed_at
+        if hasattr(record, 'duration_ms'):
+            record.duration_ms = duration_ms
+            
         session.add(record)
         await session.commit()
 

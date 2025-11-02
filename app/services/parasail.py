@@ -1,5 +1,6 @@
 import base64
 import logging
+import time
 from typing import Any, Optional
 
 from openai import OpenAI
@@ -28,9 +29,28 @@ class ParasailOCRClient:
         input_text: str,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        """Placeholder method to demonstrate Parasail OCR interaction."""
-        response = self.client.embeddings.create(model=model or self.default_model, input=input_text, **kwargs)
-        return response.to_dict()
+        """Simple text extraction using chat completions."""
+        model_name = model or self.default_model
+        start_time = time.time()
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": input_text}],
+                **kwargs
+            )
+            end_time = time.time()
+            
+            result = response.to_dict() if hasattr(response, 'to_dict') else response.model_dump()
+            result['_timing'] = {
+                'start_time': start_time,
+                'end_time': end_time,
+                'duration_ms': int((end_time - start_time) * 1000)
+            }
+            return result
+        except Exception as exc:
+            self._logger.exception("Parasail text extraction failed", exc_info=exc)
+            raise
 
     def extract_document(
         self,
@@ -40,35 +60,83 @@ class ParasailOCRClient:
         mime_type: Optional[str] = None,
         model: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Attempt to submit a document for OCR; falls back to placeholder payload on failure."""
-
+        """
+        Submit a document for OCR using Parasail API.
+        Uses chat.completions endpoint with base64 encoded document.
+        """
         model_name = model or self.default_model
         encoded = base64.b64encode(content).decode("utf-8")
-        prompt = "Extract raw text from the attached base64 document and return JSON with a `text` key."
+        
+        # Construct the prompt for OCR extraction
+        prompt = """Extract all text content from this document. Return the extracted text in a structured format.
+        
+Please extract:
+1. All visible text from the document
+2. Any tables or structured data
+3. Key-value pairs if present
 
+Return the results in JSON format with these keys:
+- text: The full extracted text
+- tables: Array of any tables found
+- key_value_pairs: Object of any key-value data found"""
+
+        start_time = time.time()
+        
         try:
-            response = self.client.responses.create(
+            # Try using chat.completions with image content
+            self._logger.info("Calling Parasail API with model: %s for file: %s", model_name, filename)
+            
+            response = self.client.chat.completions.create(
                 model=model_name,
-                input=[
+                messages=[
                     {
                         "role": "user",
                         "content": [
-                            {"type": "input_text", "text": prompt},
+                            {"type": "text", "text": prompt},
                             {
-                                "type": "input_file",
-                                "data": encoded,
-                                "name": filename,
-                                "media_type": mime_type or "application/octet-stream",
-                            },
-                        ],
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime_type or 'application/pdf'};base64,{encoded}"
+                                }
+                            }
+                        ]
                     }
                 ],
+                max_tokens=4096,
             )
-            return response.to_dict()
-        except Exception as exc:  # pragma: no cover - dependent on Parasail endpoint availability
-            self._logger.warning("Parasail OCR request failed: %s", exc)
+            
+            end_time = time.time()
+            duration_ms = int((end_time - start_time) * 1000)
+            
+            self._logger.info("Parasail API call completed in %d ms", duration_ms)
+            
+            # Convert response to dict
+            result = response.to_dict() if hasattr(response, 'to_dict') else response.model_dump()
+            
+            # Add timing metadata
+            result['_timing'] = {
+                'start_time': start_time,
+                'end_time': end_time,
+                'duration_ms': duration_ms
+            }
+            
+            return result
+            
+        except Exception as exc:
+            end_time = time.time()
+            duration_ms = int((end_time - start_time) * 1000)
+            
+            self._logger.exception("Parasail OCR request failed after %d ms: %s", duration_ms, exc)
+            
+            # Return error response with timing
             return {
                 "model": model_name,
                 "error": str(exc),
-                "message": "Parasail OCR request failed or endpoint not yet available.",
+                "error_type": type(exc).__name__,
+                "message": "Parasail OCR request failed. Check API key and model availability.",
+                "_timing": {
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "duration_ms": duration_ms
+                }
             }
