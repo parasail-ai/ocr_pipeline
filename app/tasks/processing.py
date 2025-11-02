@@ -16,6 +16,7 @@ from app.db.models import (
     DocumentContent,
     DocumentExtraction,
     DocumentOcrResult,
+    DocumentSchema,
     SchemaDefinition,
 )
 from app.db.session import AsyncSessionLocal
@@ -23,6 +24,7 @@ from app.services.blob_storage import BlobStorageService
 from app.services.classifier import DocumentClassifier
 from app.services.docling import DoclingProcessor, DoclingUnavailable
 from app.services.parasail import ParasailOCRClient
+from app.services.schema_generator import SchemaGenerator
 from app.services.table_extractor import TableExtractor
 
 logger = logging.getLogger(__name__)
@@ -133,14 +135,26 @@ async def process_document_task(
         finally:
             temp_path.unlink(missing_ok=True)
 
-    if initial_schema_id is None:
-        base_text = parasail_text or docling_text
-        if base_text:
+    # Auto-generate schema and extract key-value pairs if no schema was provided
+    base_text = parasail_text or docling_text
+    if base_text:
+        if initial_schema_id is None:
             await _maybe_classify_document(
                 document_id=document_id,
                 base_text=base_text,
                 snippets={"parasail": parasail_text, "docling": docling_text},
             )
+            # Auto-generate schema from OCR output
+            await _auto_generate_schema(
+                document_id=document_id,
+                ocr_text=base_text,
+            )
+        
+        # Extract key-value pairs regardless of schema
+        await _extract_key_value_pairs(
+            document_id=document_id,
+            ocr_text=base_text,
+        )
 
 
 async def _update_document_status(document_id: uuid.UUID, *, status: str, details: dict) -> None:
@@ -391,3 +405,152 @@ async def _extract_and_store_tables(document_id: uuid.UUID, file_path: Path) -> 
             session.add_all(extractions)
             await session.commit()
             logger.info("Stored %d extractions for document %s", len(extractions), document_id)
+
+
+async def _auto_generate_schema(
+    document_id: uuid.UUID,
+    ocr_text: str,
+) -> None:
+    """Auto-generate schema from OCR text and apply to document."""
+    logger.info("Auto-generating schema for document %s", document_id)
+    
+    try:
+        generator = SchemaGenerator()
+    except RuntimeError as exc:
+        logger.warning("Schema generator not available: %s", exc)
+        return
+    
+    async with AsyncSessionLocal() as session:
+        # Get document and existing schemas
+        document = await session.get(Document, document_id)
+        if not document:
+            return
+        
+        # Get existing schemas for reference
+        stmt = select(SchemaDefinition)
+        result = await session.execute(stmt)
+        existing_schemas = [
+            {
+                "id": str(s.id),
+                "name": s.name,
+                "category": s.category,
+                "fields": s.fields
+            }
+            for s in result.scalars().all()
+        ]
+        
+        # Generate schema
+        try:
+            schema_data = await asyncio.to_thread(
+                generator.generate_schema_from_text,
+                ocr_text,
+                document_type=document.detected_type,
+                existing_schemas=existing_schemas if existing_schemas else None
+            )
+            
+            if not schema_data:
+                logger.warning("Schema generation returned no data for document %s", document_id)
+                return
+            
+            schema_name = schema_data.get("schema_name", "Auto-Generated Schema")
+            category = schema_data.get("category", "unknown")
+            description = schema_data.get("description", "Automatically generated from OCR")
+            fields = schema_data.get("fields", [])
+            extracted_values = schema_data.get("extracted_values", {})
+            
+            # Check if schema with this name already exists
+            stmt = select(SchemaDefinition).where(
+                func.lower(SchemaDefinition.name) == schema_name.lower()
+            )
+            existing_schema = await session.scalar(stmt)
+            
+            if existing_schema:
+                logger.info("Using existing schema '%s' for document %s", schema_name, document_id)
+                schema = existing_schema
+            else:
+                # Create new schema
+                schema = SchemaDefinition(
+                    name=schema_name,
+                    category=category,
+                    description=description,
+                    fields={"fields": fields},  # Store as dict with fields key
+                )
+                session.add(schema)
+                await session.flush()
+                logger.info("Created new auto-generated schema '%s'", schema_name)
+            
+            # Apply schema to document with extracted values
+            if extracted_values:
+                assignment = DocumentSchema(
+                    document_id=document_id,
+                    schema_id=schema.id,
+                    extracted_values=extracted_values
+                )
+                session.add(assignment)
+                
+                # Update document selected schema if not set
+                if not document.selected_schema_id:
+                    document.selected_schema_id = schema.id
+                    
+                # Update detected type if not set
+                if not document.detected_type and category != "unknown":
+                    document.detected_type = category
+                    document.detected_confidence = 0.8  # AI-generated confidence
+                
+                logger.info(
+                    "Applied auto-generated schema '%s' to document %s with %d values",
+                    schema_name,
+                    document_id,
+                    len(extracted_values)
+                )
+            
+            await session.commit()
+            
+        except Exception as exc:
+            logger.exception("Failed to auto-generate schema for document %s: %s", document_id, exc)
+
+
+async def _extract_key_value_pairs(
+    document_id: uuid.UUID,
+    ocr_text: str,
+) -> None:
+    """Extract key-value pairs from OCR text and store as extraction."""
+    logger.info("Extracting key-value pairs for document %s", document_id)
+    
+    try:
+        generator = SchemaGenerator()
+    except RuntimeError as exc:
+        logger.warning("Schema generator not available for key-value extraction: %s", exc)
+        return
+    
+    try:
+        # Extract key-value pairs
+        kv_pairs = await asyncio.to_thread(generator.extract_key_value_pairs, ocr_text)
+        
+        if not kv_pairs:
+            logger.info("No key-value pairs extracted for document %s", document_id)
+            return
+        
+        # Store as document extraction
+        async with AsyncSessionLocal() as session:
+            extraction = DocumentExtraction(
+                document_id=document_id,
+                extraction_type="key_value",
+                source="ai_extraction",
+                data=kv_pairs,
+                extraction_metadata={
+                    "pair_count": len(kv_pairs),
+                    "extraction_method": "schema_generator"
+                }
+            )
+            session.add(extraction)
+            await session.commit()
+            
+            logger.info(
+                "Stored %d key-value pairs for document %s",
+                len(kv_pairs),
+                document_id
+            )
+            
+    except Exception as exc:
+        logger.exception("Failed to extract key-value pairs for document %s: %s", document_id, exc)
