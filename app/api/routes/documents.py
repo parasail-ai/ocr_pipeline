@@ -122,6 +122,7 @@ async def upload_document(
             schemas=[],
             contents=[],
             classifications=[],
+            extractions=[],
             selected_schema=None,
         )
         
@@ -260,6 +261,7 @@ async def list_documents(db: AsyncSession = Depends(get_db)) -> DocumentList:
             selectinload(Document.schemas).selectinload(DocumentSchema.schema),
             selectinload(Document.contents),
             selectinload(Document.classifications),
+            selectinload(Document.extractions),
         )
         .order_by(Document.uploaded_at.desc())
     )
