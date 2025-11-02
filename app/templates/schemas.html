@@ -341,21 +341,52 @@
             const container = document.getElementById('schemas-container');
             
             if (schemas.length === 0) {
-                container.innerHTML = '<p style="color: #999;">No schemas yet. Schemas will be automatically created when you process documents with AI extraction enabled.</p>';
+                container.innerHTML = '<p style="color: #999;">No schemas yet. You can save schemas from the document staging page after processing.</p>';
                 return;
             }
             
             container.innerHTML = schemas.map(schema => `
                 <div class="schema-item">
-                    <h3>${escapeHtml(schema.name)}</h3>
-                    <p>${escapeHtml(schema.description || 'No description')}</p>
-                    <div style="margin-top: 0.5rem; font-size: 12px; color: #999;">
-                        <span>Category: ${escapeHtml(schema.category || 'N/A')}</span> • 
-                        <span>${schema.fields?.length || 0} fields</span> •
-                        <span>Created: ${new Date(schema.created_at).toLocaleDateString()}</span>
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <h3>${escapeHtml(schema.name)}</h3>
+                            <p>${escapeHtml(schema.description || 'No description')}</p>
+                            <div style="margin-top: 0.5rem; font-size: 12px; color: #999;">
+                                <span>Category: ${escapeHtml(schema.category || 'N/A')}</span> • 
+                                <span>${schema.fields?.length || 0} fields</span> •
+                                <span>Created: ${new Date(schema.created_at).toLocaleDateString()}</span>
+                            </div>
+                        </div>
+                        <button onclick="deleteSchema('${schema.id}', '${escapeHtml(schema.name)}')" 
+                                style="background: #f44336; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap;">
+                            🗑️ Delete
+                        </button>
                     </div>
                 </div>
             `).join('');
+        }
+        
+        async function deleteSchema(schemaId, schemaName) {
+            if (!confirm(`Are you sure you want to delete the schema "${schemaName}"? This cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/schemas/${schemaId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showAlert(`Schema "${schemaName}" deleted successfully`, 'success');
+                    loadSchemas(); // Reload the list
+                } else {
+                    const error = await response.json().catch(() => ({}));
+                    showAlert(error.detail || 'Failed to delete schema', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting schema:', error);
+                showAlert('Failed to delete schema', 'error');
+            }
         }
 
         function showAlert(message, type) {

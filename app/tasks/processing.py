@@ -165,7 +165,7 @@ async def process_document_task(
         finally:
             temp_path.unlink(missing_ok=True)
 
-    # Auto-generate schema and extract key-value pairs if no schema was provided
+    # Extract key-value pairs and classify document (no auto-schema generation)
     base_text = parasail_text or docling_text
     if base_text:
         if initial_schema_id is None:
@@ -174,11 +174,7 @@ async def process_document_task(
                 base_text=base_text,
                 snippets={"parasail": parasail_text, "docling": docling_text},
             )
-            # Auto-generate schema from OCR output
-            await _auto_generate_schema(
-                document_id=document_id,
-                ocr_text=base_text,
-            )
+            # Schema generation disabled - users must manually save schemas from UI
         
         # Extract key-value pairs regardless of schema
         await _extract_key_value_pairs(

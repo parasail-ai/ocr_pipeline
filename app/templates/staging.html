@@ -352,9 +352,49 @@
 
       <div class="tab-content" id="tab-fields" style="display: none;">
         <div class="schema-panel-content">
-          <h2 class="card-title">Extracted Fields</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 class="card-title" style="margin: 0;">Extracted Fields</h2>
+            <button id="save-schema-btn" onclick="showSaveSchemaDialog()" 
+                    style="background: #4caf50; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; display: none;">
+              💾 Save as Schema
+            </button>
+          </div>
           <div id="extracted-fields-display">
             <p style="color: #666;">Processing document... Fields will appear here once extraction is complete.</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Save Schema Modal -->
+      <div id="save-schema-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+        <div style="background: white; border-radius: 12px; padding: 2rem; max-width: 500px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+          <h2 style="margin: 0 0 1.5rem 0; font-size: 1.5rem;">Save as Schema</h2>
+          <div style="display: grid; gap: 1rem;">
+            <div>
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 14px;">Schema Name</label>
+              <input id="schema-name-input" type="text" placeholder="e.g., Invoice, Receipt, ID Card" 
+                     style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 14px;">Category (Optional)</label>
+              <input id="schema-category-input" type="text" placeholder="e.g., Financial, Identity, Legal" 
+                     style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 14px;">Description (Optional)</label>
+              <textarea id="schema-description-input" placeholder="Describe what this schema is for..." 
+                        style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-height: 80px; box-sizing: border-box; font-family: inherit;"></textarea>
+            </div>
+          </div>
+          <div style="display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end;">
+            <button onclick="closeSaveSchemaDialog()" 
+                    style="background: #f5f5f5; color: #666; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;">
+              Cancel
+            </button>
+            <button onclick="saveSchemaToDatabase()" 
+                    style="background: #4caf50; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">
+              Save Schema
+            </button>
           </div>
         </div>
       </div>
@@ -737,15 +777,24 @@
 
       function updateExtractedFieldsTab() {
         const fieldsDisplay = document.getElementById('extracted-fields-display');
+        const saveSchemaBtn = document.getElementById('save-schema-btn');
         
         if (!docData || !docData.schemas || docData.schemas.length === 0) {
           fieldsDisplay.innerHTML = '<p style="color: #999; padding: 2rem; text-align: center;">No extracted fields yet. Processing in progress...</p>';
+          saveSchemaBtn.style.display = 'none';
           return;
         }
 
         const schema = docData.schemas[0];
         const values = schema.extracted_values || {};
         const schemaInfo = schema.schema;
+        
+        // Show save button if we have extracted values and no saved schema
+        if (Object.keys(values).length > 0 && !schemaInfo) {
+          saveSchemaBtn.style.display = 'block';
+        } else {
+          saveSchemaBtn.style.display = 'none';
+        }
 
         if (Object.keys(values).length === 0) {
           fieldsDisplay.innerHTML = '<p style="color: #999; padding: 2rem; text-align: center;">No fields extracted from this document.</p>';
@@ -877,6 +926,83 @@
         window.document.body.removeChild(a);
         URL.revokeObjectURL(url);
       };
+
+      // Save Schema Dialog Functions
+      function showSaveSchemaDialog() {
+        const modal = document.getElementById('save-schema-modal');
+        modal.style.display = 'flex';
+        
+        // Auto-populate schema name from document type if available
+        if (docData && docData.detected_type) {
+          document.getElementById('schema-name-input').value = docData.detected_type;
+        }
+      }
+      
+      function closeSaveSchemaDialog() {
+        const modal = document.getElementById('save-schema-modal');
+        modal.style.display = 'none';
+        
+        // Clear inputs
+        document.getElementById('schema-name-input').value = '';
+        document.getElementById('schema-category-input').value = '';
+        document.getElementById('schema-description-input').value = '';
+      }
+      
+      async function saveSchemaToDatabase() {
+        const schemaName = document.getElementById('schema-name-input').value.trim();
+        const category = document.getElementById('schema-category-input').value.trim();
+        const description = document.getElementById('schema-description-input').value.trim();
+        
+        if (!schemaName) {
+          alert('Please enter a schema name');
+          return;
+        }
+        
+        if (!docData || !docData.schemas || docData.schemas.length === 0) {
+          alert('No schema data available to save');
+          return;
+        }
+        
+        const schema = docData.schemas[0];
+        const values = schema.extracted_values || {};
+        
+        // Build fields array from extracted values
+        const fields = Object.keys(values).map(key => ({
+          name: key,
+          type: 'string',
+          description: `Field: ${key.replace(/_/g, ' ')}`,
+          required: false
+        }));
+        
+        try {
+          const response = await fetch('/api/schemas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: schemaName,
+              category: category || null,
+              description: description || `Auto-generated from ${docData.original_filename}`,
+              fields: fields
+            })
+          });
+          
+          if (response.ok) {
+            const savedSchema = await response.json();
+            alert(`Schema "${schemaName}" saved successfully!`);
+            closeSaveSchemaDialog();
+            
+            // Reload document to reflect the saved schema
+            await loadDocument();
+            updateExtractedFieldsTab();
+          } else {
+            const error = await response.json().catch(() => ({}));
+            alert(error.detail || 'Failed to save schema');
+          }
+        } catch (error) {
+          console.error('Error saving schema:', error);
+          alert('Failed to save schema');
+        }
+      }
 
       // Add click handlers to tab buttons
       document.querySelectorAll('.tab-btn').forEach(btn => {
