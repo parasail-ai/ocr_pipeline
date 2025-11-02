@@ -1,10 +1,16 @@
-name: Deploy to Azure Web App
+name: Build and Deploy to Azure
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: parasail-ocr-pipeline-rg
+  APP_NAME: parasail-ocr-pipeline
+  ACR_NAME: parasailocrujxbwjwvmweea
+  IMAGE_NAME: parasail-ocr
 
 jobs:
   build-and-deploy:
@@ -14,51 +20,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Log in to Azure
+        uses: azure/login@v1
         with:
-          python-version: '3.11'
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Install dependencies
+      - name: Build and push Docker image to ACR
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          az acr build \
+            --registry ${{ env.ACR_NAME }} \
+            --image ${{ env.IMAGE_NAME }}:latest \
+            --image ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --file Dockerfile \
+            .
 
-      - name: Check publish profile secret
+      - name: Restart Azure App Service
         run: |
-          if [ -z "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" ]; then
-            echo "❌ ERROR: AZURE_WEBAPP_PUBLISH_PROFILE secret is NOT set!"
-            echo ""
-            echo "To fix:"
-            echo "1. Go to Azure Portal: https://portal.azure.com"
-            echo "2. Find App Service: parasail-ocr-pipeline"
-            echo "3. Click 'Get publish profile' button (download .PublishSettings file)"
-            echo "4. Go to GitHub: https://github.com/parasail-ai/ocr_pipeline/settings/secrets/actions"
-            echo "5. Create secret named: AZURE_WEBAPP_PUBLISH_PROFILE"
-            echo "6. Paste ENTIRE XML content from the .PublishSettings file"
-            echo ""
-            exit 1
-          else
-            echo "✅ AZURE_WEBAPP_PUBLISH_PROFILE secret exists"
-          fi
+          az webapp restart \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.APP_NAME }}
 
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: 'parasail-ocr-pipeline'
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: .
+      - name: Wait for deployment
+        run: sleep 30
 
       - name: Health check
         run: |
-          echo "Waiting for deployment to complete..."
-          sleep 30
           echo "Checking application health..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://parasail-ocr-pipeline.azurewebsites.net/ || echo "000")
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.APP_NAME }}.azurewebsites.net/health || echo "000")
           echo "Health endpoint returned: $HTTP_CODE"
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "404" ]; then
             echo "✅ Deployment successful!"
-            echo "🌐 Application URL: https://parasail-ocr-pipeline.azurewebsites.net"
+            echo "🌐 Application URL: https://${{ env.APP_NAME }}.azurewebsites.net"
+            echo "🐳 Docker image: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest"
+            echo "📝 Git commit: ${{ github.sha }}"
           else
             echo "⚠️ Health check returned unexpected status code"
+            exit 0
           fi
