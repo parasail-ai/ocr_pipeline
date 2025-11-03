@@ -165,6 +165,10 @@ async def list_folders(
     # Ensure trash folder exists
     await get_or_create_trash_folder(session)
     
+    # Check if user is admin
+    session_token = request.cookies.get("session_token")
+    is_admin = AuthService.is_admin(session_token)
+    
     result = await session.execute(
         select(Folder).order_by(Folder.path)
     )
@@ -173,6 +177,10 @@ async def list_folders(
     # Get document counts for all folders
     folder_responses = []
     for folder in folders:
+        # Skip trash folder for non-admin users
+        if folder.is_trash and not is_admin:
+            continue
+        
         doc_count_result = await session.execute(
             select(func.count(Document.id)).where(Document.folder_id == folder.id)
         )
