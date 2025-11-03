@@ -589,24 +589,62 @@
         if (docData.id) {
           const contentUrl = `/api/documents/${docData.id}/content`;
           console.log("Setting preview src to:", contentUrl);
-          previewIframe.src = contentUrl;
           
-          // Add error handler for iframe
-          previewIframe.onerror = function() {
-            console.error("Failed to load document preview from:", contentUrl);
+          // Check if file type can be previewed in iframe
+          const filename = docData.original_filename || docData.filename || '';
+          const extension = filename.split('.').pop().toLowerCase();
+          
+          // File types that can't be previewed in iframe
+          const nonPreviewableTypes = ['xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt', 'csv'];
+          
+          if (nonPreviewableTypes.includes(extension)) {
+            // Show download message for non-previewable files
             previewIframe.style.display = "none";
-            const errorMsg = document.createElement("div");
-            errorMsg.style.padding = "2rem";
-            errorMsg.style.textAlign = "center";
-            errorMsg.style.color = "#666";
-            errorMsg.innerHTML = `
-              <p>Unable to preview document in browser.</p>
-              <a href="${contentUrl}" target="_blank" style="color: #1976d2; text-decoration: none;">
-                🔗 Open document in new tab
+            const existingMsg = previewIframe.parentNode.querySelector('.preview-message');
+            if (existingMsg) existingMsg.remove();
+            
+            const downloadMsg = document.createElement("div");
+            downloadMsg.className = 'preview-message';
+            downloadMsg.style.cssText = "padding: 3rem; text-align: center; background: #f9f9f9; border-radius: 8px; border: 2px dashed #ddd;";
+            downloadMsg.innerHTML = `
+              <div style="font-size: 64px; margin-bottom: 1rem;">📄</div>
+              <h3 style="margin: 0 0 0.5rem 0; color: #333;">${extension.toUpperCase()} File</h3>
+              <p style="color: #666; margin-bottom: 1.5rem;">This file type cannot be previewed in the browser.</p>
+              <a href="${contentUrl}" download="${filename}" 
+                 style="display: inline-block; background: #1976d2; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">
+                ⬇️ Download File
               </a>
+              <div style="margin-top: 1rem;">
+                <a href="${contentUrl}" target="_blank" 
+                   style="color: #1976d2; text-decoration: none; font-size: 14px;">
+                  🔗 Open in new tab
+                </a>
+              </div>
             `;
-            previewIframe.parentNode.appendChild(errorMsg);
-          };
+            previewIframe.parentNode.appendChild(downloadMsg);
+          } else {
+            // Previewable file (PDF, images, etc.)
+            previewIframe.src = contentUrl;
+            
+            // Add error handler for iframe
+            previewIframe.onerror = function() {
+              console.error("Failed to load document preview from:", contentUrl);
+              previewIframe.style.display = "none";
+              const existingMsg = previewIframe.parentNode.querySelector('.preview-message');
+              if (existingMsg) existingMsg.remove();
+              
+              const errorMsg = document.createElement("div");
+              errorMsg.className = 'preview-message';
+              errorMsg.style.cssText = "padding: 2rem; text-align: center; color: #666;";
+              errorMsg.innerHTML = `
+                <p>Unable to preview document in browser.</p>
+                <a href="${contentUrl}" target="_blank" style="color: #1976d2; text-decoration: none;">
+                  🔗 Open document in new tab
+                </a>
+              `;
+              previewIframe.parentNode.appendChild(errorMsg);
+            };
+          }
         } else {
           console.warn("No document ID available");
         }
