@@ -851,7 +851,15 @@
         }
 
         function filterDocumentsByFolder(documents) {
-            console.log('Filtering documents. currentFolderId:', currentFolderId, 'isAdmin:', isAdmin, 'trashFolderId:', trashFolderId);
+            console.log('=== filterDocumentsByFolder ===');
+            console.log('currentFolderId:', currentFolderId);
+            console.log('isAdmin:', isAdmin);
+            console.log('trashFolderId:', trashFolderId);
+            console.log('Total input documents:', documents.length);
+            console.log('Documents with folder_id:', documents.filter(d => d.folder_id).map(d => ({
+                filename: d.original_filename, 
+                folder_id: d.folder_id
+            })));
             
             // First filter by folder
             let filtered;
