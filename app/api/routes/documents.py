@@ -322,22 +322,17 @@ async def list_documents(request: Request, db: AsyncSession = Depends(get_db)) -
     result = await db.execute(query)
     documents = list(result.scalars().all())
     
-    # Filter documents based on user permissions
-    if is_admin:
-        # Admins see all documents
-        pass
-    elif current_user:
-        # Logged-in non-admin users: only show their own documents + anonymous documents
-        current_username = current_user.get("username")
+    # Get trash folder ID
+    trash_folder_result = await db.execute(
+        select(Folder.id).where(Folder.is_trash == True)
+    )
+    trash_folder_id = trash_folder_result.scalar_one_or_none()
+    
+    # Filter out trash documents for non-admin users
+    if not is_admin and trash_folder_id:
         documents = [
             doc for doc in documents 
-            if doc.details.get("uploaded_by") in [current_username, "anonymous"]
-        ]
-    else:
-        # Not logged in: only show anonymous documents
-        documents = [
-            doc for doc in documents 
-            if doc.details.get("uploaded_by") == "anonymous"
+            if doc.folder_id != trash_folder_id
         ]
     
     # Return documents with empty collections for heavy relationships
