@@ -1,4 +1,6 @@
 import hashlib
+import hmac
+import os
 import secrets
 import uuid
 from datetime import datetime
@@ -7,6 +9,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.db.models import User
 
 
@@ -19,6 +22,8 @@ class AuthService:
     
     # Session store (in production, use Redis or database)
     _sessions: dict[str, dict] = {}
+    _settings = get_settings()
+    _SESSION_SECRET = _settings.session_secret.encode()
     
     @staticmethod
     def hash_password(password: str) -> str:
@@ -125,36 +130,67 @@ class AuthService:
         return False
     
     @classmethod
+    def _sign_session_payload(cls, payload: str) -> str:
+        signature = hmac.new(cls._SESSION_SECRET, payload.encode(), hashlib.sha256).hexdigest()
+        return signature
+
+    @classmethod
     async def create_session(cls, db: AsyncSession, email: str) -> str:
         """Create a new session and return session token."""
-        session_token = secrets.token_urlsafe(32)
-        
+        random_token = secrets.token_urlsafe(16)
+
         # Check if user is in database
         user = await cls.get_user_by_email(db, email)
-        is_admin = user.is_admin if user else (email == cls.ADMIN_EMAIL)
-        user_id = str(user.id) if user else None
-        
+        is_admin = bool(user.is_admin) if user else (email == cls.ADMIN_EMAIL)
+        user_id = str(user.id) if user else ""
+
+        payload = "|".join([random_token, user_id, "1" if is_admin else "0", email])
+        signature = cls._sign_session_payload(payload)
+        session_token = f"{payload}|{signature}"
+
         cls._sessions[session_token] = {
             "email": email,
             "is_admin": is_admin,
-            "user_id": user_id
+            "user_id": user_id or None,
         }
         return session_token
+
+    @classmethod
+    def _decode_session(cls, session_token: Optional[str]) -> Optional[dict]:
+        if not session_token:
+            return None
+
+        if session_token in cls._sessions:
+            return cls._sessions[session_token]
+
+        parts = session_token.split("|")
+        if len(parts) != 5:
+            return None
+
+        random_token, user_id, is_admin_flag, email, signature = parts
+        payload = "|".join([random_token, user_id, is_admin_flag, email])
+        expected_signature = cls._sign_session_payload(payload)
+        if not hmac.compare_digest(signature, expected_signature):
+            return None
+
+        data = {
+            "email": email,
+            "is_admin": is_admin_flag == "1",
+            "user_id": user_id or None,
+        }
+        cls._sessions[session_token] = data
+        return data
     
     @classmethod
     def get_session_user(cls, session_token: Optional[str]) -> Optional[str]:
         """Get user email from session token."""
-        if not session_token:
-            return None
-        session = cls._sessions.get(session_token)
+        session = cls._decode_session(session_token)
         return session["email"] if session else None
     
     @classmethod
     def is_admin(cls, session_token: Optional[str]) -> bool:
         """Check if session token belongs to admin user."""
-        if not session_token:
-            return False
-        session = cls._sessions.get(session_token)
+        session = cls._decode_session(session_token)
         return session.get("is_admin", False) if session else False
     
     @classmethod
@@ -165,12 +201,10 @@ class AuthService:
     @classmethod
     def get_user_from_session(cls, session_token: Optional[str]) -> Optional[dict]:
         """Get user info dict from session token."""
-        if not session_token:
-            return None
-        session = cls._sessions.get(session_token)
+        session = cls._decode_session(session_token)
         if not session:
             return None
-        
+
         email = session["email"]
         return {
             "email": email,

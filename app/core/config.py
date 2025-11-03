@@ -29,6 +29,12 @@ class Settings(BaseSettings):
         validation_alias="ALLOWED_ORIGINS",
     )
 
+    session_secret: str = Field(
+        "change-me",
+        validation_alias="SESSION_SECRET",
+        description="Secret key used to sign session cookies.",
+    )
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", env_prefix="APP_", extra="ignore")
 
     @computed_field(return_type=List[str])

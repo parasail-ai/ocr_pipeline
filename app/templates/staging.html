@@ -496,6 +496,8 @@
           updateExtractedFieldsTab();
         } else if (tabName === 'json') {
           updateJSONTab();
+        } else if (tabName === 'tables') {
+          updateTablesTab();
         }
       }
 
@@ -540,6 +542,10 @@
                           docData.schemas[0].extracted_values && 
                           Object.keys(docData.schemas[0].extracted_values).length > 0;
         updateTabSpinner(fieldsTab, !hasFields && docData.status !== 'processed');
+
+        const tablesTab = document.getElementById('tab-btn-tables');
+        const hasTables = docData.extractions && docData.extractions.some(e => e.extraction_type === 'table');
+        updateTabSpinner(tablesTab, !hasTables && docData.status !== 'processed');
       }
       
       function updateTabSpinner(tabElement, showSpinner) {
@@ -567,6 +573,7 @@
         
         // Update tab spinners
         updateTabSpinners();
+        updateTablesTab();
 
         // Update preview - use the content endpoint instead of blob_url
         const previewIframe = document.getElementById("document-preview");
@@ -928,6 +935,33 @@
         html += '</div>';
 
         fieldsDisplay.innerHTML = html;
+      }
+
+      function updateTablesTab() {
+        const container = document.getElementById('table-extraction-display');
+        if (!container) return;
+
+        if (!docData) {
+          container.innerHTML = '<p style="color: #666;">Loading table extraction data...</p>';
+          return;
+        }
+
+        const tables = Array.isArray(docData.extractions)
+          ? docData.extractions.filter(extraction => extraction.extraction_type === 'table')
+          : [];
+
+        if (!tables.length) {
+          container.innerHTML = docData.status === 'processed'
+            ? '<p style="color: #666;">No tables were detected in this document.</p>'
+            : '<p style="color: #666;">Table extraction results will appear here once processing completes.</p>';
+          return;
+        }
+
+        container.innerHTML = `
+          <div style="color: #555;">
+            <p style="margin: 0 0 0.5rem 0;">${tables.length} table${tables.length === 1 ? '' : 's'} detected. Detailed table rendering will be available soon.</p>
+          </div>
+        `;
       }
 
       function updateJSONTab() {
