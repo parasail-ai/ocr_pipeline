@@ -554,7 +554,7 @@
                 <a href="/documents" class="nav-link active">Documents</a>
                 <a href="/schemas" class="nav-link">Schemas</a>
                 <a href="/models" class="nav-link">Models</a>
-                <a href="/reference" class="nav-link admin-only">API</a>
+                <a href="/docs" class="nav-link" target="_blank">API Docs</a>
                 <a href="/users" class="nav-link">Users</a>
                 <a href="/analytics" class="nav-link">Analytics</a>
             </div>
@@ -592,7 +592,7 @@
                         <div id="guestFilterContainer" style="display: none;">
                             <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 14px; cursor: pointer;">
                                 <input type="checkbox" id="showGuestDocs" checked style="cursor: pointer;">
-                                <span>Show Guest Documents</span>
+                                <span style="font-weight: 600;">Show Guest Documents</span>
                             </label>
                         </div>
                         <div class="view-toggle">
@@ -758,8 +758,14 @@
         function renderFolders(folders) {
             const folderTree = document.getElementById('folderTree');
             
-            // Filter folders: only show trash to admins
+            // Find the Home folder (is_home=true)
+            const homeFolder = folders.find(f => f.is_home);
+            
+            // Filter folders: only show trash to admins, exclude home folder from custom folders
             const visibleFolders = folders.filter(folder => {
+                // Skip home folder - we'll render it separately
+                if (folder.is_home) return false;
+                
                 const isTrash = folder.is_trash || false;
                 // If it's trash, only show to admins
                 if (isTrash) {
@@ -781,20 +787,42 @@
                 `;
             }).join('');
             
-            // Insert after the uncategorized folder
-            folderTree.innerHTML = `
+            // Build folder tree with Home folder first (if user is logged in and has one)
+            let folderTreeHTML = '';
+            
+            // Add Home folder (renamed to "My Documents") if it exists
+            if (homeFolder && isLoggedIn) {
+                folderTreeHTML += `
+                    <li class="folder-item" data-folder-id="${homeFolder.id}" data-is-trash="false">
+                        <span class="folder-icon">🏠</span>
+                        <span class="folder-name">My Documents</span>
+                        <span class="folder-count">${homeFolder.document_count || 0}</span>
+                    </li>
+                `;
+            }
+            
+            // Add All Documents
+            folderTreeHTML += `
                 <li class="folder-item active" data-folder-id="all">
                     <span class="folder-icon">📁</span>
                     <span class="folder-name">All Documents</span>
                     <span class="folder-count" id="allCount">0</span>
                 </li>
+            `;
+            
+            // Add Uncategorized
+            folderTreeHTML += `
                 <li class="folder-item" data-folder-id="uncategorized">
                     <span class="folder-icon">📂</span>
                     <span class="folder-name">Uncategorized</span>
                     <span class="folder-count" id="uncategorizedCount">0</span>
                 </li>
-                ${customFolders}
             `;
+            
+            // Add custom folders
+            folderTreeHTML += customFolders;
+            
+            folderTree.innerHTML = folderTreeHTML;
             
             // Add click handlers
             document.querySelectorAll('.folder-item').forEach(item => {
