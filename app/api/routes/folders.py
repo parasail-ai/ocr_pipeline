@@ -53,6 +53,7 @@ class FolderResponse(BaseModel):
     document_count: int
     is_system: bool = False
     is_trash: bool = False
+    is_home: bool = False
     created_at: str
     updated_at: str
 
@@ -228,6 +229,7 @@ async def list_folders(
             document_count=doc_count,
             is_system=folder.is_system if hasattr(folder, 'is_system') else False,
             is_trash=folder.is_trash if hasattr(folder, 'is_trash') else False,
+            is_home=folder.is_home if hasattr(folder, 'is_home') else False,
             created_at=folder.created_at.isoformat(),
             updated_at=folder.updated_at.isoformat()
         ))
