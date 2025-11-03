@@ -203,6 +203,11 @@ async def users_page(
 
 
 @app.get("/reference", include_in_schema=False, response_class=HTMLResponse)
-async def scalar_reference() -> HTMLResponse:
+async def scalar_reference(
+    session_token: Optional[str] = Cookie(None)
+) -> HTMLResponse:
+    if not AuthService.is_admin(session_token):
+        return RedirectResponse(url="/login?return=/reference", status_code=status.HTTP_303_SEE_OTHER)
+
     html = SCALAR_TEMPLATE.format(title=settings.app_name, spec_url=app.openapi_url)
     return HTMLResponse(html)
