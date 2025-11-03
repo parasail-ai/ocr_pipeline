@@ -175,5 +175,6 @@ class AuthService:
         return {
             "email": email,
             "username": email.split("@")[0],
-            "is_admin": session.get("is_admin", False)
+            "is_admin": session.get("is_admin", False),
+            "user_id": session.get("user_id")
         }

@@ -600,7 +600,8 @@
                             </button>
                             <button class="view-btn" onclick="setView('list')" data-view="list">
                                 <span>☰ List</span>
-                        </button>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -860,8 +861,19 @@
                     return docFolderId !== trashId;
                 });
             } else if (currentFolderId === 'uncategorized') {
-                // Uncategorized: only docs with no folder_id
-                filtered = documents.filter(doc => !doc.folder_id);
+                // Uncategorized: only docs with no folder_id AND not in trash
+                filtered = documents.filter(doc => {
+                    if (!doc.folder_id) {
+                        // If there's a trash folder, make sure this doc isn't in it
+                        if (trashFolderId) {
+                            const docFolderId = doc.folder_id ? String(doc.folder_id) : null;
+                            const trashId = String(trashFolderId);
+                            return docFolderId !== trashId;
+                        }
+                        return true;
+                    }
+                    return false;
+                });
             } else {
                 // Specific folder (including trash): show only docs in that folder
                 filtered = documents.filter(doc => {
@@ -870,6 +882,13 @@
                     console.log('Comparing doc folder_id:', docFolderId, 'with currentFolderId:', selectedFolderId, 'match:', docFolderId === selectedFolderId);
                     return docFolderId === selectedFolderId;
                 });
+            }
+            
+            // Apply guest filter for logged-in non-admin users (but NOT when viewing trash)
+            // Admins viewing trash should see all trash documents regardless of owner
+            if (isLoggedIn && !isAdmin && !showGuestDocs && !isTrashFolder) {
+                // Filter out guest documents (documents with no user_id)
+                filtered = filtered.filter(doc => doc.user_id !== null);
             }
             
             console.log(`Final filtered count: ${filtered.length}`);
@@ -921,6 +940,12 @@
             const icon = getDocumentIcon(doc.original_filename || doc.filename);
             const date = new Date(doc.uploaded_at || doc.created_at).toLocaleDateString();
             
+            // Determine if document is from guest
+            const isGuestDoc = !doc.user_id;
+            const ownerBadge = isGuestDoc ? 
+                '<span style="display: inline-block; padding: 2px 8px; background: #e3f2fd; color: #1976d2; border-radius: 10px; font-size: 11px; font-weight: 500; margin-left: 8px;">👤 Guest</span>' : 
+                '';
+            
             // Get extracted values from schemas
             let extractedInfo = '';
             if (doc.schemas && doc.schemas.length > 0) {
@@ -949,8 +974,7 @@
                         <div class="document-info">
                             <h3 class="document-name" title="${escapeHtml(doc.original_filename || doc.filename)}">${escapeHtml(doc.original_filename || doc.filename)}</h3>
                             <div class="document-meta">
-                                <div>Uploaded: ${date}</div>
-                                ${doc.details && doc.details.uploaded_by ? `<div>By: ${escapeHtml(doc.details.uploaded_by)}</div>` : ''}
+                                <div>Uploaded: ${date} ${isGuestDoc ? '(Guest)' : doc.user_id ? '(User)' : ''}</div>
                                 ${doc.file_size ? `<div>Size: ${formatFileSize(doc.file_size)}</div>` : ''}
                                 ${doc.detected_type ? `<div>Type: ${escapeHtml(doc.detected_type)}</div>` : ''}
                                 ${doc.selected_model ? `<div>Model: ${escapeHtml(doc.selected_model)}</div>` : ''}

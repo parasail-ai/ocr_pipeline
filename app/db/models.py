@@ -29,18 +29,23 @@ class Folder(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     parent_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("folders.id", ondelete="CASCADE"), nullable=True
     )
     path: Mapped[str] = mapped_column(String(2048), nullable=False)  # Full path for quick lookups
     is_system: Mapped[bool] = mapped_column(Boolean, default=False)  # System folders like trash
     is_trash: Mapped[bool] = mapped_column(Boolean, default=False)  # Mark as trash folder
+    is_home: Mapped[bool] = mapped_column(Boolean, default=False)  # Mark as user's home folder
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     parent: Mapped["Folder | None"] = relationship("Folder", remote_side=[id], foreign_keys=[parent_id], back_populates="children")
     children: Mapped[list["Folder"]] = relationship("Folder", back_populates="parent", cascade="all, delete-orphan")
     documents: Mapped[list["Document"]] = relationship(back_populates="folder")
+    user: Mapped["User | None"] = relationship("User", foreign_keys=[user_id])
 
 
 class Document(Base):

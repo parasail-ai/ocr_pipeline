@@ -88,11 +88,22 @@ async def upload_document(
         # Get current user from session (None for anonymous uploads)
         session_token = request.cookies.get("session_token")
         user_id_uuid = None
+        user_home_folder_id = None
+        
         if session_token:
             user_data = AuthService.get_user_from_session(session_token)
             if user_data and user_data.get("user_id"):
                 try:
                     user_id_uuid = uuid.UUID(user_data.get("user_id"))
+                    
+                    # Get user's home folder
+                    home_folder_result = await db.execute(
+                        select(Folder.id).where(
+                            Folder.user_id == user_id_uuid,
+                            Folder.is_home == True
+                        )
+                    )
+                    user_home_folder_id = home_folder_result.scalar_one_or_none()
                 except (ValueError, TypeError):
                     pass
         
@@ -100,6 +111,7 @@ async def upload_document(
         document = Document(
             original_filename=file.filename,
             user_id=user_id_uuid,  # None for anonymous
+            folder_id=user_home_folder_id,  # Assign to user's Home folder if logged in
             selected_model=model_name,
             selected_schema_id=schema_uuid,
             blob_path=blob_path,
@@ -332,11 +344,15 @@ async def list_documents(request: Request, db: AsyncSession = Depends(get_db)) -
     result = await db.execute(query)
     documents = list(result.scalars().all())
     
-    # Get trash folder ID
-    trash_folder_result = await db.execute(
-        select(Folder.id).where(Folder.is_trash == True)
-    )
-    trash_folder_id = trash_folder_result.scalar_one_or_none()
+    # Get trash folder ID (safely handle if is_trash column doesn't exist yet)
+    trash_folder_id = None
+    try:
+        trash_folder_result = await db.execute(
+            select(Folder.id).where(Folder.is_trash == True).limit(1)
+        )
+        trash_folder_id = trash_folder_result.scalar()
+    except Exception as e:
+        logger.warning(f"Could not query trash folder: {e}")
     
     # Filter documents based on user permissions
     filtered_documents = []
@@ -364,6 +380,7 @@ async def list_documents(request: Request, db: AsyncSession = Depends(get_db)) -
         DocumentRead(
             id=doc.id,
             original_filename=doc.original_filename,
+            user_id=doc.user_id,
             selected_model=doc.selected_model,
             selected_schema_id=doc.selected_schema_id,
             blob_path=doc.blob_path,

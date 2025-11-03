@@ -136,23 +136,28 @@ async def create_folder(
 
 async def get_or_create_trash_folder(session: AsyncSession) -> Folder:
     """Get or create the trash folder"""
-    result = await session.execute(
-        select(Folder).where(Folder.is_trash == True)
-    )
-    trash_folder = result.scalar_one_or_none()
-    
-    if not trash_folder:
-        trash_folder = Folder(
-            name="🗑️ Trash",
-            path="🗑️ Trash",
-            is_system=True,
-            is_trash=True
+    try:
+        result = await session.execute(
+            select(Folder).where(Folder.is_trash == True).limit(1)
         )
-        session.add(trash_folder)
-        await session.commit()
-        await session.refresh(trash_folder)
-    
-    return trash_folder
+        trash_folder = result.scalars().first()
+        
+        if not trash_folder:
+            trash_folder = Folder(
+                name="🗑️ Trash",
+                path="🗑️ Trash",
+                is_system=True,
+                is_trash=True
+            )
+            session.add(trash_folder)
+            await session.commit()
+            await session.refresh(trash_folder)
+        
+        return trash_folder
+    except Exception as e:
+        # If is_trash column doesn't exist yet or any error, rollback and return None
+        await session.rollback()
+        return None
 
 
 @router.get("", response_model=FolderListResponse)
@@ -165,9 +170,19 @@ async def list_folders(
     # Ensure trash folder exists
     await get_or_create_trash_folder(session)
     
-    # Check if user is admin
+    # Check if user is admin and get current user ID
     session_token = request.cookies.get("session_token")
     is_admin = AuthService.is_admin(session_token)
+    current_user_id = None
+    
+    if session_token:
+        user_data = AuthService.get_user_from_session(session_token)
+        if user_data and user_data.get("user_id"):
+            try:
+                from uuid import UUID
+                current_user_id = UUID(user_data.get("user_id"))
+            except (ValueError, TypeError):
+                pass
     
     result = await session.execute(
         select(Folder).order_by(Folder.path)
@@ -179,6 +194,10 @@ async def list_folders(
     for folder in folders:
         # Skip trash folder for non-admin users
         if folder.is_trash and not is_admin:
+            continue
+        
+        # Skip other users' home folders
+        if folder.is_home and folder.user_id != current_user_id and not is_admin:
             continue
         
         doc_count_result = await session.execute(

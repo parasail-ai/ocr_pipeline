@@ -69,6 +69,18 @@ async def signup(
         is_admin=False  # New signups are never admin
     )
     
+    # Create Home folder for the new user
+    from app.db.models import Folder
+    home_folder = Folder(
+        name="Home",
+        user_id=user.id,
+        path="/Home",
+        is_system=True,
+        is_home=True
+    )
+    db.add(home_folder)
+    await db.commit()
+    
     return UserResponse.from_user(user)
 
 
