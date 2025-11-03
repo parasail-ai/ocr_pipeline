@@ -741,6 +741,22 @@
                 loadDocuments();
             }, 3000);
         }
+        
+        // Clean up when navigating away
+        window.addEventListener('beforeunload', () => {
+            if (refreshTimeout) {
+                clearTimeout(refreshTimeout);
+                refreshTimeout = null;
+            }
+        });
+        
+        // Also clear timeout when page becomes hidden
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && refreshTimeout) {
+                clearTimeout(refreshTimeout);
+                refreshTimeout = null;
+            }
+        });
 
         async function loadFolders() {
             try {
