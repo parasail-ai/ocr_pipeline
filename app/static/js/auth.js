@@ -77,6 +77,10 @@ async function updateNavbar() {
         const dropdownMenu = document.createElement('div');
         dropdownMenu.className = 'profile-dropdown-menu';
         dropdownMenu.innerHTML = `
+            <a href="/docs" class="profile-dropdown-item" target="_blank">
+                <span>📚</span> API Docs
+            </a>
+            <div class="profile-dropdown-divider"></div>
             <a href="#" class="profile-dropdown-item" onclick="event.preventDefault(); openChangePasswordModal();">
                 <span>🔒</span> Change Password
             </a>

@@ -89,6 +89,12 @@
             color: #b71c1c;
         }
         
+        .folder-item.drag-over {
+            background: #bbdefb !important;
+            border: 2px dashed var(--primary-color);
+            transform: scale(1.02);
+        }
+        
         .folder-icon {
             font-size: 18px;
         }
@@ -172,6 +178,11 @@
         .document-card:hover {
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             transform: translateY(-2px);
+        }
+        
+        .document-card.dragging {
+            opacity: 0.5;
+            cursor: move;
         }
         
         .document-card-header {
@@ -554,14 +565,6 @@
                 <a href="/documents" class="nav-link active">Documents</a>
                 <a href="/schemas" class="nav-link">Schemas</a>
                 <a href="/models" class="nav-link">Models</a>
-                <div class="nav-dropdown">
-                    <button class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">
-                        More ▾
-                    </button>
-                    <div class="nav-dropdown-menu">
-                        <a href="/docs" class="nav-dropdown-item" target="_blank">API Docs</a>
-                    </div>
-                </div>
                 <a href="/users" class="nav-link">Users</a>
                 <a href="/analytics" class="nav-link">Analytics</a>
             </div>
@@ -850,6 +853,14 @@
             // Add click handlers
             document.querySelectorAll('.folder-item').forEach(item => {
                 item.addEventListener('click', () => selectFolder(item.dataset.folderId, item.dataset.isTrash === 'true'));
+                
+                // Add drag and drop handlers (but not for "All Documents" or "Uncategorized" virtual folders)
+                const folderId = item.dataset.folderId;
+                if (folderId !== 'all' && folderId !== 'uncategorized') {
+                    item.addEventListener('dragover', handleFolderDragOver);
+                    item.addEventListener('dragleave', handleFolderDragLeave);
+                    item.addEventListener('drop', handleFolderDrop);
+                }
             });
         }
 
@@ -900,6 +911,13 @@
             }
             
             container.innerHTML = filteredDocs.map(doc => createDocumentCard(doc)).join('');
+            
+            // Add drag event listeners to document cards
+            document.querySelectorAll('.document-card').forEach(card => {
+                card.setAttribute('draggable', 'true');
+                card.addEventListener('dragstart', handleDocumentDragStart);
+                card.addEventListener('dragend', handleDocumentDragEnd);
+            });
         }
 
         function getDocumentDisplayName(doc) {
@@ -1047,7 +1065,7 @@
             }
             
             return `
-                <div class="document-card" onclick="openDocument('${doc.id}')">
+                <div class="document-card" data-document-id="${doc.id}" onclick="openDocument('${doc.id}')">
                     <div class="document-card-header">
                         <div class="document-icon">${icon}</div>
                         <div class="document-info">
@@ -1236,6 +1254,125 @@
         function showError(message) {
             alert(message);
         }
+
+        // Drag and Drop functionality
+        let draggedDocumentId = null;
+
+        function handleDocumentDragStart(e) {
+            draggedDocumentId = e.currentTarget.dataset.documentId;
+            e.currentTarget.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', draggedDocumentId);
+        }
+
+        function handleDocumentDragEnd(e) {
+            e.currentTarget.classList.remove('dragging');
+            draggedDocumentId = null;
+        }
+
+        function handleFolderDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function handleFolderDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        async function handleFolderDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.classList.remove('drag-over');
+            
+            const folderId = e.currentTarget.dataset.folderId;
+            const documentId = draggedDocumentId;
+            
+            if (!documentId || !folderId) {
+                return;
+            }
+            
+            // Don't allow dropping into virtual folders
+            if (folderId === 'all' || folderId === 'uncategorized') {
+                return;
+            }
+            
+            try {
+                // Move document to folder
+                const response = await fetch(`/api/folders/${folderId}/documents/${documentId}`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to move document to folder');
+                }
+                
+                // Show success feedback
+                const folderName = e.currentTarget.querySelector('.folder-name').textContent;
+                showSuccessToast(`Document moved to ${folderName}`);
+                
+                // Reload folders and documents to update counts
+                await loadFolders();
+                await loadDocuments();
+                
+            } catch (error) {
+                console.error('Error moving document:', error);
+                alert('Failed to move document to folder');
+            }
+        }
+
+        function showSuccessToast(message) {
+            // Create a temporary toast notification
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: #4caf50;
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                z-index: 10000;
+                font-size: 14px;
+                font-weight: 500;
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 2000);
+        }
     </script>
+    <style>
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+    </style>
 </body>
 </html>

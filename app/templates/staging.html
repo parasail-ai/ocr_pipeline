@@ -347,7 +347,7 @@
             📋 Table Extraction
           </button>
           <button class="tab-btn" id="tab-btn-json" data-tab="json">
-            💾 JSON Output
+            💾 JSON Optimized Output
           </button>
         </div>
       </div>
@@ -429,7 +429,7 @@
 
       <div class="tab-content" id="tab-json" style="display: none;">
         <div class="status-panel">
-          <h2 class="card-title">JSON Structured Output</h2>
+          <h2 class="card-title">JSON Optimized Output</h2>
           <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
             <button onclick="copyJSON()" style="padding: 0.5rem 1rem; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">
               📋 Copy JSON
@@ -474,6 +474,7 @@
       let docData = null;
       let startTime = Date.now();
       let timeInterval;
+      let isAdmin = false;
 
       // Tab switching function - MUST be defined first
       function switchTab(tabName) {
@@ -1220,7 +1221,29 @@
         });
       });
 
-      // Initialize - Start polling and time tracking
+      // Check admin status and hide table extraction tab if not admin
+      async function checkAdminStatus() {
+        try {
+          const response = await fetch('/api/auth/session');
+          if (response.ok) {
+            const data = await response.json();
+            isAdmin = data.is_admin || false;
+            
+            // Hide table extraction tab for non-admins
+            if (!isAdmin) {
+              const tablesTabBtn = document.getElementById('tab-btn-tables');
+              if (tablesTabBtn) {
+                tablesTabBtn.style.display = 'none';
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to check admin status:', error);
+        }
+      }
+
+      // Initialize - Check admin status, start polling and time tracking
+      checkAdminStatus();
       loadDocument();
       pollInterval = setInterval(loadDocument, 2000); // Poll every 2 seconds
       timeInterval = setInterval(updateElapsedTime, 1000); // Update time every second
