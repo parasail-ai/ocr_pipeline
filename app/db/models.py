@@ -10,6 +10,23 @@ class Base(DeclarativeBase):
     pass
 
 
+# User model temporarily disabled - will be added back with migration
+# class User(Base):
+#     """User accounts for authentication and document ownership"""
+#     __tablename__ = "users"
+#     
+#     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+#     username: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+#     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+#     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+#     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+#     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+#     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+#     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+#     
+#     documents: Mapped[list["Document"]] = relationship(back_populates="user")
+
+
 class Folder(Base):
     """Folders for organizing documents"""
     __tablename__ = "folders"
@@ -50,8 +67,15 @@ class Document(Base):
     last_processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     detected_type: Mapped[str | None] = mapped_column(String(150), nullable=True)
     detected_confidence: Mapped[float | None] = mapped_column(nullable=True)
+    # user_id: Mapped[uuid.UUID | None] = mapped_column(
+    #     UUID(as_uuid=True), 
+    #     ForeignKey("users.id", ondelete="SET NULL"),
+    #     nullable=True,  # nullable for now - documents without users
+    #     index=True
+    # )
 
     folder: Mapped["Folder | None"] = relationship(back_populates="documents")
+    # user: Mapped["User | None"] = relationship(back_populates="documents")  # DISABLED until migration runs
     schemas: Mapped[list["DocumentSchema"]] = relationship(back_populates="document", cascade="all, delete-orphan")
     ocr_results: Mapped[list["DocumentOcrResult"]] = relationship(
         back_populates="document", cascade="all, delete-orphan", order_by="desc(DocumentOcrResult.created_at)"
