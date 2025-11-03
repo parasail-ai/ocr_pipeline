@@ -201,11 +201,9 @@
                 
                 if (response.ok) {
                     const data = await response.json();
-                    // Redirect to home or previous page with cache-busting reload
+                    // Redirect to home or previous page
                     const returnUrl = new URLSearchParams(window.location.search).get('return') || '/';
                     window.location.href = returnUrl;
-                    // Force full page reload to update navbar
-                    window.location.reload(true);
                 } else {
                     const error = await response.json().catch(() => ({ detail: 'Login failed' }));
                     errorMessage.textContent = error.detail || 'Invalid email or password';
