@@ -21,6 +21,10 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    
+    # Relationships
+    api_keys: Mapped[list["UserApiKey"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Folder(Base):
@@ -205,29 +209,15 @@ class DocumentExtraction(Base):
     document: Mapped[Document] = relationship(back_populates="extractions")
 
 
-class ApiProfile(Base):
-    """User profiles for API access"""
-    __tablename__ = "api_profiles"
+class UserApiKey(Base):
+    """API keys for user authentication"""
+    __tablename__ = "user_api_keys"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    api_keys: Mapped[list["ApiKey"]] = relationship(back_populates="profile", cascade="all, delete-orphan")
-
-
-class ApiKey(Base):
-    """API keys for authentication"""
-    __tablename__ = "api_keys"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    profile_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("api_profiles.id", ondelete="CASCADE"), nullable=False
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    key_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     key_prefix: Mapped[str] = mapped_column(String(20), nullable=False)  # First few chars for identification
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -235,7 +225,7 @@ class ApiKey(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    profile: Mapped[ApiProfile] = relationship(back_populates="api_keys")
+    user: Mapped[User] = relationship(back_populates="api_keys")
 
 
 class OcrModel(Base):

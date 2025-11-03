@@ -1,52 +1,76 @@
 """Authentication dependencies for FastAPI"""
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Cookie, Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
-from app.db.models import ApiProfile
+from app.db.models import User
 from app.db.session import get_db
 from app.services.auth import AuthService
+from app.services.api_key_service import authenticate_api_key
 
 security = HTTPBearer(auto_error=False)
 
 
-async def get_api_key_optional(
+def get_current_user(
+    session_token: Optional[str] = Cookie(None),
     credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
-    db: AsyncSession = Depends(get_db)
-) -> Optional[ApiProfile]:
+    db: Session = Depends(get_db)
+) -> User:
     """
-    Optional API key authentication - returns profile if valid key provided, None otherwise
-    """
-    if not credentials:
-        return None
+    Get the current authenticated user from either session cookie or API key.
     
-    profile = await AuthService.validate_api_key(credentials.credentials, db)
-    return profile
+    Raises 401 if no valid authentication is provided.
+    """
+    # Try API key authentication first
+    if credentials:
+        user = authenticate_api_key(db, credentials.credentials)
+        if user:
+            return user
+    
+    # Try session authentication
+    if session_token:
+        email = AuthService.get_session_user(session_token)
+        if email:
+            user = db.query(User).filter(User.email == email, User.is_active == True).first()
+            if user:
+                return user
+    
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
-async def get_api_key_required(
+def get_current_user_optional(
+    session_token: Optional[str] = Cookie(None),
     credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
-    db: AsyncSession = Depends(get_db)
-) -> ApiProfile:
+    db: Session = Depends(get_db)
+) -> Optional[User]:
     """
-    Required API key authentication - raises 401 if no valid key provided
+    Get the current authenticated user from either session cookie or API key.
+    
+    Returns None if no valid authentication is provided.
     """
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="API key required",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    # Try API key authentication first
+    if credentials:
+        user = authenticate_api_key(db, credentials.credentials)
+        if user:
+            return user
     
-    profile = await AuthService.validate_api_key(credentials.credentials, db)
+    # Try session authentication
+    if session_token:
+        email = AuthService.get_session_user(session_token)
+        if email:
+            user = db.query(User).filter(User.email == email, User.is_active == True).first()
+            if user:
+                return user
     
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired API key",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    return profile
+    return None
+
+
+# Backward compatibility aliases
+get_api_key_optional = get_current_user_optional
+get_api_key_required = get_current_user

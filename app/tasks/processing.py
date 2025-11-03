@@ -78,94 +78,8 @@ async def process_document_task(
     docling_extraction: dict[str, Any] | None = None
     docling_text: str | None = None
     
-    # Check if we can extract text directly without OCR (for HTML, CSV, DOCX, etc.)
-    text_extractor = TextExtractionService()
-    filename = Path(blob_path).name
-    
-    if text_extractor.can_extract_text(content_type, filename):
-        logger.info(f"Document {filename} is a structured format - extracting text directly without OCR")
-        
-        await _update_document_status(
-            document_id,
-            status="extracting_text",
-            details={"stage": "text_extraction", "format": "structured"}
-        )
-        
-        try:
-            # Extract text directly from structured document
-            extraction_result = await asyncio.to_thread(
-                text_extractor.extract_text,
-                file_bytes,
-                content_type,
-                filename
-            )
-            
-            extracted_text = extraction_result.get("text", "")
-            structured_data = extraction_result.get("structured_data")
-            format_type = extraction_result.get("format", "unknown")
-            
-            logger.info(
-                f"Text extraction completed for {filename}: format={format_type}, "
-                f"text_length={len(extracted_text)}, has_structured_data={structured_data is not None}"
-            )
-            
-            # Use extracted text as if it came from OCR
-            parasail_text = extracted_text
-            parasail_response = {
-                "source": "text_extraction",
-                "format": format_type,
-                "text": extracted_text,
-                "structured_data": structured_data,
-                "extraction_method": "direct"
-            }
-            
-            # Store as content
-            await _store_document_contents(
-                document_id=document_id,
-                contents={
-                    "text_extraction": extracted_text,
-                },
-            )
-            
-            # Store extraction result
-            if structured_data:
-                async with AsyncSessionLocal() as session:
-                    extraction = DocumentExtraction(
-                        document_id=document_id,
-                        extraction_type="structured_data",
-                        source="text_extraction",
-                        data=structured_data,
-                        extraction_metadata={
-                            "format": format_type,
-                            "text_length": len(extracted_text),
-                        }
-                    )
-                    session.add(extraction)
-                    await session.commit()
-            
-            await _update_document_status(
-                document_id,
-                status="processing",
-                details={
-                    "content_type": content_type,
-                    "stage": "text_extracted",
-                    "format": format_type,
-                    "extraction_method": "direct",
-                    "text_length": len(extracted_text),
-                },
-            )
-            
-            # Skip OCR section entirely - text is already extracted
-            model_name = None  # Prevent OCR processing below
-            
-        except Exception as exc:
-            logger.exception("Text extraction failed for document %s", document_id, exc_info=exc)
-            await _update_document_status(
-                document_id,
-                status="error",
-                details={"stage": "text_extraction_failed", "error": str(exc)}
-            )
-            return
+    # Note: Direct text extraction disabled for DOCX, XLSX, HTML
+    # All documents now go through image conversion -> OCR pipeline for consistency
     
     # Only use Docling if no model is specified (disabled by default)
     # Users must select a Parasail model for OCR processing
@@ -188,13 +102,25 @@ async def process_document_task(
             
             client = ParasailOCRClient()
             
-            # Check if this is a multi-page document (PDF or PPTX)
+            # Check if this is a document that needs conversion to images (PDF, PPTX, DOCX, XLSX, HTML)
             converter = DocumentConverterService()
             filename = Path(blob_path).name
             
-            # Check if it's a multi-page document that should be converted to images
-            if converter.is_pdf(file_bytes) or converter.is_pptx(file_bytes):
-                doc_type = "PDF" if converter.is_pdf(file_bytes) else "PPTX"
+            # Check if it's a document that should be converted to images for OCR
+            if (converter.is_pdf(file_bytes) or converter.is_pptx(file_bytes) or 
+                converter.is_docx(file_bytes) or converter.is_xlsx(file_bytes) or 
+                converter.is_html(file_bytes)):
+                
+                if converter.is_pdf(file_bytes):
+                    doc_type = "PDF"
+                elif converter.is_pptx(file_bytes):
+                    doc_type = "PPTX"
+                elif converter.is_docx(file_bytes):
+                    doc_type = "DOCX"
+                elif converter.is_xlsx(file_bytes):
+                    doc_type = "XLSX"
+                else:
+                    doc_type = "HTML"
                 
                 if converter.is_pdf(file_bytes):
                     page_count = await asyncio.to_thread(converter.get_page_count, file_bytes)
@@ -223,13 +149,19 @@ async def process_document_task(
                         # Extract combined text from multi-page response
                         parasail_text = parasail_response.get("combined_text", "")
                     else:
-                        # Single page PDF - process normally
-                        logger.info(f"Processing single-page PDF")
+                        # Single page PDF - convert to image first
+                        logger.info(f"Processing single-page PDF - converting to image")
+                        page_images = await asyncio.to_thread(
+                            converter.convert_to_images,
+                            file_bytes,
+                            filename,
+                            dpi=200
+                        )
                         parasail_response = await asyncio.to_thread(
                             client.extract_document,
-                            content=file_bytes,
+                            content=page_images[0] if page_images else file_bytes,
                             filename=filename,
-                            mime_type=content_type,
+                            mime_type="image/png",
                             model=model_name,
                         )
                         parasail_text = _extract_text_from_parasail_response(parasail_response)
@@ -270,6 +202,144 @@ async def process_document_task(
                             parasail_text = _extract_text_from_parasail_response(parasail_response)
                     except Exception as exc:
                         logger.warning(f"PPTX conversion failed: {str(exc)}, processing as single file")
+                        # Fallback to processing original file
+                        parasail_response = await asyncio.to_thread(
+                            client.extract_document,
+                            content=file_bytes,
+                            filename=filename,
+                            mime_type=content_type,
+                            model=model_name,
+                        )
+                        parasail_text = _extract_text_from_parasail_response(parasail_response)
+                        
+                elif converter.is_docx(file_bytes):
+                    # DOCX - convert pages to images
+                    logger.info(f"Detected DOCX file, converting pages to images...")
+                    try:
+                        page_images = await asyncio.to_thread(
+                            converter.convert_to_images,
+                            file_bytes,
+                            filename,
+                            dpi=200  # Good quality for OCR
+                        )
+                        logger.info(f"Converted DOCX to {len(page_images)} page images")
+                        
+                        if len(page_images) > 1:
+                            # Process all pages
+                            parasail_response = await asyncio.to_thread(
+                                client.extract_multi_page,
+                                page_images=page_images,
+                                filename=filename,
+                                model=model_name,
+                            )
+                            logger.info(f"Parasail multi-page OCR completed for {len(page_images)} pages")
+                            
+                            # Extract combined text from multi-page response
+                            parasail_text = parasail_response.get("combined_text", "")
+                        else:
+                            # Single page - process normally
+                            parasail_response = await asyncio.to_thread(
+                                client.extract_document,
+                                content=page_images[0] if page_images else file_bytes,
+                                filename=filename,
+                                mime_type="image/png",
+                                model=model_name,
+                            )
+                            parasail_text = _extract_text_from_parasail_response(parasail_response)
+                    except Exception as exc:
+                        logger.warning(f"DOCX conversion failed: {str(exc)}, processing as single file")
+                        # Fallback to processing original file
+                        parasail_response = await asyncio.to_thread(
+                            client.extract_document,
+                            content=file_bytes,
+                            filename=filename,
+                            mime_type=content_type,
+                            model=model_name,
+                        )
+                        parasail_text = _extract_text_from_parasail_response(parasail_response)
+                        
+                elif converter.is_xlsx(file_bytes):
+                    # XLSX - convert sheets to images
+                    logger.info(f"Detected XLSX file, converting sheets to images...")
+                    try:
+                        page_images = await asyncio.to_thread(
+                            converter.convert_to_images,
+                            file_bytes,
+                            filename,
+                            dpi=200  # Good quality for OCR
+                        )
+                        logger.info(f"Converted XLSX to {len(page_images)} sheet images")
+                        
+                        if len(page_images) > 1:
+                            # Process all sheets
+                            parasail_response = await asyncio.to_thread(
+                                client.extract_multi_page,
+                                page_images=page_images,
+                                filename=filename,
+                                model=model_name,
+                            )
+                            logger.info(f"Parasail multi-page OCR completed for {len(page_images)} sheets")
+                            
+                            # Extract combined text from multi-page response
+                            parasail_text = parasail_response.get("combined_text", "")
+                        else:
+                            # Single sheet - process normally
+                            parasail_response = await asyncio.to_thread(
+                                client.extract_document,
+                                content=page_images[0] if page_images else file_bytes,
+                                filename=filename,
+                                mime_type="image/png",
+                                model=model_name,
+                            )
+                            parasail_text = _extract_text_from_parasail_response(parasail_response)
+                    except Exception as exc:
+                        logger.warning(f"XLSX conversion failed: {str(exc)}, processing as single file")
+                        # Fallback to processing original file
+                        parasail_response = await asyncio.to_thread(
+                            client.extract_document,
+                            content=file_bytes,
+                            filename=filename,
+                            mime_type=content_type,
+                            model=model_name,
+                        )
+                        parasail_text = _extract_text_from_parasail_response(parasail_response)
+                        
+                elif converter.is_html(file_bytes):
+                    # HTML - convert to images
+                    logger.info(f"Detected HTML file, converting to images...")
+                    try:
+                        page_images = await asyncio.to_thread(
+                            converter.convert_to_images,
+                            file_bytes,
+                            filename,
+                            dpi=200  # Good quality for OCR
+                        )
+                        logger.info(f"Converted HTML to {len(page_images)} page images")
+                        
+                        if len(page_images) > 1:
+                            # Process all pages
+                            parasail_response = await asyncio.to_thread(
+                                client.extract_multi_page,
+                                page_images=page_images,
+                                filename=filename,
+                                model=model_name,
+                            )
+                            logger.info(f"Parasail multi-page OCR completed for {len(page_images)} pages")
+                            
+                            # Extract combined text from multi-page response
+                            parasail_text = parasail_response.get("combined_text", "")
+                        else:
+                            # Single page - process normally
+                            parasail_response = await asyncio.to_thread(
+                                client.extract_document,
+                                content=page_images[0] if page_images else file_bytes,
+                                filename=filename,
+                                mime_type="image/png",
+                                model=model_name,
+                            )
+                            parasail_text = _extract_text_from_parasail_response(parasail_response)
+                    except Exception as exc:
+                        logger.warning(f"HTML conversion failed: {str(exc)}, processing as single file")
                         # Fallback to processing original file
                         parasail_response = await asyncio.to_thread(
                             client.extract_document,
@@ -377,8 +447,15 @@ async def process_document_task(
                 document_id=document_id,
                 ocr_text=base_text,
             )
+        else:
+            # Schema was selected - use custom query-based extraction
+            await _extract_with_custom_schema(
+                document_id=document_id,
+                schema_id=initial_schema_id,
+                ocr_text=base_text,
+            )
         
-        # Extract key-value pairs regardless of schema
+        # Extract key-value pairs regardless of schema (legacy support)
         await _extract_key_value_pairs(
             document_id=document_id,
             ocr_text=base_text,
@@ -818,6 +895,73 @@ async def _auto_generate_schema_fallback(
             await session.commit()
         except Exception as exc:
             logger.exception("Failed to auto-generate schema for document %s: %s", document_id, exc)
+
+
+async def _extract_with_custom_schema(
+    document_id: uuid.UUID,
+    schema_id: uuid.UUID,
+    ocr_text: str,
+) -> None:
+    """
+    Extract values using custom schema queries.
+    When a schema is selected, use its field queries for precise extraction.
+    """
+    logger.info(f"Extracting with custom schema {schema_id} for document {document_id}")
+    
+    try:
+        ai_generator = create_ai_schema_generator()
+    except RuntimeError as exc:
+        logger.warning(f"AI schema generator not available: {exc}")
+        return
+    
+    async with AsyncSessionLocal() as session:
+        # Get the schema
+        schema = await session.get(SchemaDefinition, schema_id)
+        if not schema:
+            logger.warning(f"Schema {schema_id} not found")
+            return
+        
+        # Get the schema fields
+        schema_fields = schema.fields
+        if isinstance(schema_fields, dict):
+            # Handle old format where fields might be nested
+            schema_fields = schema_fields.get("fields", schema_fields)
+        
+        if not isinstance(schema_fields, list):
+            logger.warning(f"Schema {schema_id} has invalid fields format")
+            return
+        
+        logger.info(f"Extracting {len(schema_fields)} fields from schema '{schema.name}'")
+        
+        # Extract values using the schema's custom queries
+        try:
+            extracted_values = await asyncio.to_thread(
+                ai_generator.extract_schema_fields,
+                ocr_text,
+                schema_fields
+            )
+            
+            logger.info(f"Extracted {len(extracted_values)} values using custom schema")
+            
+            # Store the extraction results
+            if extracted_values:
+                assignment = DocumentSchema(
+                    document_id=document_id,
+                    schema_id=schema_id,
+                    extracted_values=extracted_values
+                )
+                session.add(assignment)
+                
+                # Update document with schema selection
+                document = await session.get(Document, document_id)
+                if document and not document.selected_schema_id:
+                    document.selected_schema_id = schema_id
+                
+                await session.commit()
+                logger.info(f"Stored custom schema extraction for document {document_id}")
+            
+        except Exception as exc:
+            logger.exception(f"Failed to extract with custom schema: {exc}")
 
 
 async def _extract_key_value_pairs(

@@ -248,10 +248,71 @@
         </div>
         {% endif %}
 
+        <!-- Create Custom Schema -->
+        <div class="config-section">
+            <div class="config-header">
+                <div>
+                    <h2 style="margin: 0 0 0.5rem 0;">✏️ Create Custom Schema</h2>
+                    <p style="margin: 0; color: #666; font-size: 14px;">Define extraction fields with custom queries. Each query will be used to extract specific data from documents.</p>
+                </div>
+            </div>
+
+            <form id="schema-form" class="config-form">
+                <div class="form-group">
+                    <label for="schema-name">Schema Name *</label>
+                    <input 
+                        type="text" 
+                        id="schema-name" 
+                        name="schema_name"
+                        placeholder="e.g., Invoice Schema, Receipt Schema"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="schema-category">Category</label>
+                    <input 
+                        type="text" 
+                        id="schema-category" 
+                        name="category"
+                        placeholder="e.g., invoice, receipt, contract"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="schema-description">Description</label>
+                    <input 
+                        type="text" 
+                        id="schema-description" 
+                        name="description"
+                        placeholder="Brief description of this schema"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label>Extraction Fields</label>
+                    <span class="help-text">Add fields with queries that will extract data from the OCR text</span>
+                    
+                    <div id="fields-container" style="margin-top: 1rem;">
+                        <!-- Fields will be added here dynamically -->
+                    </div>
+                    
+                    <button type="button" onclick="addField()" class="btn btn-secondary" style="margin-top: 1rem;">
+                        ➕ Add Field
+                    </button>
+                </div>
+
+                <div class="config-actions">
+                    <button type="submit" class="btn btn-primary">💾 Create Schema</button>
+                    <button type="button" class="btn btn-secondary" onclick="resetSchemaForm()">🔄 Reset</button>
+                </div>
+            </form>
+        </div>
+
         <!-- Schemas List -->
         <div class="schemas-list">
             <h2 style="margin: 0 0 1rem 0;">📋 Document Schemas</h2>
-            <p style="color: #666; margin-bottom: 1.5rem;">Auto-generated schemas from processed documents</p>
+            <p style="color: #666; margin-bottom: 1.5rem;">Manage your custom extraction schemas</p>
             
             <div id="schemas-container">
                 <p style="color: #999;">Loading schemas...</p>
@@ -429,10 +490,133 @@
             return div.innerHTML;
         }
 
+        // Schema field management
+        let fieldCounter = 0;
+
+        function addField() {
+            const container = document.getElementById('fields-container');
+            const fieldId = `field-${fieldCounter++}`;
+            
+            const fieldHtml = `
+                <div class="field-row" id="${fieldId}" style="display: grid; grid-template-columns: 1fr 2fr auto; gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: #f9f9f9; border-radius: 6px; border: 1px solid #e0e0e0;">
+                    <div>
+                        <label style="display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 0.25rem;">Field Key *</label>
+                        <input 
+                            type="text" 
+                            class="field-key" 
+                            placeholder="e.g., invoice_number"
+                            required
+                            style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;"
+                        >
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 0.25rem;">Extraction Query *</label>
+                        <input 
+                            type="text" 
+                            class="field-query" 
+                            placeholder="e.g., What is the invoice number?"
+                            required
+                            style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;"
+                        >
+                    </div>
+                    <div style="display: flex; align-items: end;">
+                        <button 
+                            type="button" 
+                            onclick="removeField('${fieldId}')"
+                            style="background: #f44336; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap;"
+                        >
+                            🗑️ Remove
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            container.insertAdjacentHTML('beforeend', fieldHtml);
+        }
+
+        function removeField(fieldId) {
+            const element = document.getElementById(fieldId);
+            if (element) {
+                element.remove();
+            }
+        }
+
+        function resetSchemaForm() {
+            document.getElementById('schema-form').reset();
+            document.getElementById('fields-container').innerHTML = '';
+            fieldCounter = 0;
+            // Add one initial field
+            addField();
+        }
+
+        // Handle schema form submission
+        document.getElementById('schema-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const schemaName = document.getElementById('schema-name').value;
+            const category = document.getElementById('schema-category').value;
+            const description = document.getElementById('schema-description').value;
+            
+            // Collect all fields
+            const fieldRows = document.querySelectorAll('.field-row');
+            const fields = [];
+            
+            for (const row of fieldRows) {
+                const key = row.querySelector('.field-key').value.trim();
+                const query = row.querySelector('.field-query').value.trim();
+                
+                if (key && query) {
+                    fields.push({
+                        key: key,
+                        query: query,
+                        description: query,  // Use query as description
+                        value_type: "string",
+                        required: false
+                    });
+                }
+            }
+            
+            if (fields.length === 0) {
+                showAlert('❌ Please add at least one extraction field', 'error');
+                return;
+            }
+            
+            const payload = {
+                name: schemaName,
+                category: category || null,
+                description: description || null,
+                fields: fields
+            };
+            
+            try {
+                const response = await fetch('/api/schemas', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (response.ok) {
+                    showAlert(`✅ Schema "${schemaName}" created successfully!`, 'success');
+                    resetSchemaForm();
+                    loadSchemas(); // Reload the schemas list
+                } else {
+                    const error = await response.json();
+                    showAlert(`❌ Failed to create schema: ${error.detail || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error creating schema:', error);
+                showAlert('❌ Failed to create schema', 'error');
+            }
+        });
+
         // Load on page load
         document.addEventListener('DOMContentLoaded', () => {
             loadConfiguration();
             loadSchemas();
+            // Add one initial field
+            addField();
         });
     </script>
 </body>

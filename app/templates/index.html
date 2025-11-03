@@ -484,10 +484,10 @@
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-icon">📎</div>
                     <p class="upload-text">Drop your documents here or click to browse</p>
-                    <p class="upload-hint">Supports PDF, PNG, JPG, JPEG, DOCX, PPTX, XLSX, HTML, CSV (Max 50MB each, multiple files allowed)</p>
+                    <p class="upload-hint">Supports PDF, PNG, JPG, JPEG, DOCX, PPTX, HTML (Max 50MB each, multiple files allowed)</p>
                 </div>
                 
-                <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.docx,.pptx,.xlsx,.html,.htm,.csv" multiple hidden>
+                <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.docx,.pptx,.html,.htm" multiple hidden>
                 
                 <div class="file-info" id="fileInfo">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -680,17 +680,15 @@
                 'image/jpg',
                 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'text/html',
-                'text/csv'
+                'text/html'
             ];
-            const validExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.docx', '.pptx', '.xlsx', '.html', '.htm', '.csv'];
+            const validExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.docx', '.pptx', '.html', '.htm'];
             const fileName = file.name.toLowerCase();
             const hasValidType = validTypes.includes(file.type);
             const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
             
             if (!hasValidType && !hasValidExtension) {
-                showStatus('Please select a supported file type (PDF, PNG, JPG, JPEG, DOCX, PPTX, XLSX, HTML, CSV)', 'error');
+                showStatus('Please select a supported file type (PDF, PNG, JPG, JPEG, DOCX, PPTX, HTML)', 'error');
                 return;
             }
 

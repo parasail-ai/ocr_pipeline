@@ -185,6 +185,51 @@ Return ONLY the extracted value, nothing else. If the value cannot be found, ret
             logger.error(f"Field extraction failed for {field_key}: {e}")
             return "Error extracting value"
     
+    def extract_schema_fields(
+        self,
+        ocr_text: str,
+        schema_fields: list[dict[str, Any]]
+    ) -> dict[str, str]:
+        """
+        Extract values for all fields in a schema using their custom queries.
+        
+        Args:
+            ocr_text: The OCR text to extract from
+            schema_fields: List of field definitions from a schema, each containing:
+                - key: Field key/name
+                - query: Query/instruction to extract this field
+                - description: Optional field description
+                
+        Returns:
+            Dictionary mapping field keys to extracted values
+        """
+        extracted_values = {}
+        
+        for field in schema_fields:
+            field_key = field.get('key')
+            field_query = field.get('query')
+            
+            if not field_key or not field_query:
+                logger.warning(f"Skipping field with missing key or query: {field}")
+                continue
+            
+            field_description = field.get('description')
+            
+            try:
+                value = self.extract_field_value(
+                    ocr_text=ocr_text,
+                    field_key=field_key,
+                    field_query=field_query,
+                    field_description=field_description
+                )
+                extracted_values[field_key] = value
+            except Exception as e:
+                logger.error(f"Failed to extract field {field_key}: {e}")
+                extracted_values[field_key] = "Error extracting value"
+        
+        logger.info(f"Extracted {len(extracted_values)} fields from custom schema")
+        return extracted_values
+    
     def _build_schema_generation_prompt(
         self,
         ocr_text: str,

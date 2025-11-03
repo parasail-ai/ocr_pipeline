@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies.auth import get_api_key_required
-from app.db.models import ApiProfile, Document, DocumentExtraction, DocumentMetrics, DocumentSchema, SchemaDefinition, Folder
+from app.db.models import Document, DocumentExtraction, DocumentMetrics, DocumentSchema, SchemaDefinition, Folder, User
 from app.db.session import get_db
 from app.services.auth import AuthService
 from app.models.document import (
@@ -808,7 +808,7 @@ async def upload_document_base64(
     background_tasks: BackgroundTasks,
     payload: DocumentBase64Upload,
     db: AsyncSession = Depends(get_db),
-    profile: ApiProfile = Depends(get_api_key_required),
+    user: User = Depends(get_api_key_required),
 ) -> DocumentRead:
     """
     Upload a document via base64 encoding (requires API key authentication)
@@ -849,6 +849,7 @@ async def upload_document_base64(
     # Create document record
     document = Document(
         original_filename=payload.filename,
+        user_id=user.id,
         selected_model=payload.model_name,
         selected_schema_id=schema_uuid,
         blob_path=blob_path,
@@ -856,8 +857,8 @@ async def upload_document_base64(
         details={
             "content_type": payload.content_type or "application/octet-stream",
             "uploaded_via": "api_base64",
-            "api_profile_id": str(profile.id),
-            "api_profile_email": profile.email,
+            "user_id": str(user.id),
+            "user_email": user.email,
         },
     )
     db.add(document)

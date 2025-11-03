@@ -30,6 +30,19 @@ class DocumentConverterService:
         return content.startswith(b'PK') and b'ppt/' in content[:1000]
     
     @staticmethod
+    def is_xlsx(content: bytes) -> bool:
+        """Check if the content is an XLSX file."""
+        # XLSX files are ZIP archives starting with PK
+        return content.startswith(b'PK') and b'xl/' in content[:1000]
+    
+    @staticmethod
+    def is_html(content: bytes) -> bool:
+        """Check if the content is an HTML file."""
+        # Check for HTML markers in first 1000 bytes
+        start = content[:1000].lower()
+        return b'<html' in start or b'<!doctype html' in start or b'<head' in start
+    
+    @staticmethod
     def is_multi_page_document(content: bytes) -> bool:
         """Check if the content is a multi-page document that needs conversion."""
         return (
@@ -43,7 +56,7 @@ class DocumentConverterService:
         """
         Convert a multi-page document to individual page images (PNG format).
         
-        Supports: PDF, DOCX, PPTX
+        Supports: PDF, DOCX, PPTX, XLSX, HTML
         
         Args:
             content: Document file content as bytes
@@ -57,8 +70,11 @@ class DocumentConverterService:
         if DocumentConverterService.is_pdf(content):
             return DocumentConverterService._convert_pdf_to_images(content, dpi)
         
-        # Try DOCX/PPTX conversion
-        if DocumentConverterService.is_docx(content) or DocumentConverterService.is_pptx(content):
+        # Try DOCX/PPTX/XLSX/HTML conversion (all use LibreOffice)
+        if (DocumentConverterService.is_docx(content) or 
+            DocumentConverterService.is_pptx(content) or
+            DocumentConverterService.is_xlsx(content) or
+            DocumentConverterService.is_html(content)):
             return DocumentConverterService._convert_office_to_images(content, filename, dpi)
         
         raise ValueError(f"Unsupported document type: {filename}")
