@@ -460,7 +460,7 @@
     </nav>
 
     <div class="container">
-        <div class="signup-banner">
+        <div class="signup-banner" id="signupBanner">
             <h2>🔒 Keep Your Information Private</h2>
             <p>Create a free account to securely store and organize your documents</p>
             <a href="/signup" class="signup-banner-btn">Sign Up Now</a>
@@ -900,6 +900,27 @@
         // Initialize
         loadSchemas();
         loadModels();
+        
+        // Hide signup banner for logged-in users
+        async function checkAuthAndHideBanner() {
+            try {
+                const response = await fetch('/api/auth/session');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.user_id) {
+                        // User is logged in, hide the signup banner
+                        const signupBanner = document.getElementById('signupBanner');
+                        if (signupBanner) {
+                            signupBanner.style.display = 'none';
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking authentication:', error);
+            }
+        }
+        
+        checkAuthAndHideBanner();
     </script>
 </body>
 </html>

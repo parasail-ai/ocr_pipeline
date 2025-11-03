@@ -371,9 +371,9 @@ async def list_documents(request: Request, db: AsyncSession = Depends(get_db)) -
         # Admin sees everything
         if is_admin:
             filtered_documents.append(doc)
-        # Logged-in user sees their own documents + guest documents
+        # Logged-in user sees ONLY their own documents
         elif current_user_id:
-            if doc.user_id == current_user_id or doc.user_id is None:
+            if doc.user_id == current_user_id:
                 filtered_documents.append(doc)
         # Guests (not logged in) see only guest documents
         else:
