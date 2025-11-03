@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import analytics, auth, documents, schemas, folders, models, config
+from app.api.routes import analytics, auth, documents, schemas, folders, models, config, users
 
 
 def get_api_router() -> APIRouter:
@@ -12,4 +12,5 @@ def get_api_router() -> APIRouter:
     router.include_router(models.router)
     router.include_router(config.router)
     router.include_router(analytics.router)
+    router.include_router(users.router)
     return router

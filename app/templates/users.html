@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - OCR Pipeline</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .users-hero {
+            text-align: center;
+            padding: 60px 20px 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .users-hero h1 {
+            font-size: 48px;
+            margin: 0 0 16px 0;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color), #2196f3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .users-hero p {
+            font-size: 18px;
+            color: #666;
+            margin: 0;
+        }
+        
+        .users-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px 60px;
+        }
+        
+        .users-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #673ab7;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5e35b1;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(103, 58, 183, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .btn-danger {
+            background: #ffebee;
+            color: #c62828;
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+        
+        .btn-danger:hover {
+            background: #ffcdd2;
+        }
+        
+        .users-table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+        
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .users-table thead {
+            background: #f8f9fa;
+        }
+        
+        .users-table th {
+            text-align: left;
+            padding: 16px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .users-table td {
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .users-table tbody tr:hover {
+            background: #fafafa;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge-admin {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .badge-user {
+            background: #f5f5f5;
+            color: #666;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        
+        .empty-state h3 {
+            margin: 0 0 8px 0;
+            font-size: 24px;
+            color: #333;
+        }
+        
+        .empty-state p {
+            margin: 0 0 24px 0;
+            color: #666;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s;
+        }
+        
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            font-size: 24px;
+            color: #333;
+        }
+        
+        .modal-close {
+            font-size: 28px;
+            color: #999;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+        
+        .modal-close:hover {
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .form-group input[type="text"],
+        .form-group input[type="email"],
+        .form-group input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #673ab7;
+            box-shadow: 0 0 0 3px rgba(103, 58, 183, 0.1);
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 32px;
+        }
+        
+        .modal-actions .btn {
+            flex: 1;
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .users-hero h1 {
+                font-size: 32px;
+            }
+            
+            .users-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 16px;
+            }
+            
+            .users-table-container {
+                overflow-x: auto;
+            }
+            
+            .users-table {
+                min-width: 600px;
+            }
+            
+            .actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+    <script src="/static/js/auth.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="https://parasail.io" target="_blank" style="color: var(--primary-color); text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    Parasail
+                </a>
+                <span style="color: #ccc; margin: 0 8px;">|</span>
+                <a href="/" style="color: var(--primary-color); text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 12px;">
+                    <span class="logo-icon">📄</span>
+                    OCR Pipeline
+                </a>
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Upload</a>
+                <a href="/documents" class="nav-link">Documents</a>
+                <a href="/schemas" class="nav-link">Schemas</a>
+                <a href="/models" class="nav-link">Models</a>
+                <a href="/analytics" class="nav-link">Analytics</a>
+                <a href="/users" class="nav-link active">Users</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="users-hero">
+            <h1>👥 User Management</h1>
+            <p>Manage user accounts and permissions</p>
+        </div>
+
+        <div class="users-container">
+            <div class="users-header">
+                <h2 style="margin: 0;">Users</h2>
+                <button class="btn btn-primary" onclick="openAddUserModal()">
+                    + Add User
+                </button>
+            </div>
+
+            <div id="usersContent">
+                <div class="loading">
+                    <p>Loading users...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New User</h2>
+                <button class="modal-close" onclick="closeAddUserModal()">×</button>
+            </div>
+            
+            <form id="addUserForm" onsubmit="submitAddUser(event)">
+                <div class="form-group">
+                    <label for="userEmail">Email *</label>
+                    <input type="email" id="userEmail" required placeholder="user@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="userPassword">Password *</label>
+                    <input type="password" id="userPassword" required placeholder="Enter password">
+                </div>
+                
+                <div class="form-group">
+                    <label class="checkbox-group">
+                        <input type="checkbox" id="isAdmin">
+                        <span>Grant admin privileges</span>
+                    </label>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddUserModal()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        Add User
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/users');
+                if (!response.ok) {
+                    throw new Error('Failed to load users');
+                }
+                
+                const data = await response.json();
+                const users = data.items || [];
+                
+                const container = document.getElementById('usersContent');
+                
+                if (users.length === 0) {
+                    container.innerHTML = `
+                        <div class="users-table-container">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">👥</div>
+                                <h3>No Users Yet</h3>
+                                <p>Get started by adding your first user</p>
+                                <button class="btn btn-primary" onclick="openAddUserModal()">
+                                    + Add Your First User
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="users-table-container">
+                        <table class="users-table">
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Created</th>
+                                    <th>Last Login</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${users.map(user => `
+                                    <tr>
+                                        <td><strong>${escapeHtml(user.email)}</strong></td>
+                                        <td>
+                                            <span class="badge ${user.is_admin ? 'badge-admin' : 'badge-user'}">
+                                                ${user.is_admin ? 'Admin' : 'User'}
+                                            </span>
+                                        </td>
+                                        <td>${formatDate(user.created_at)}</td>
+                                        <td>${user.last_login_at ? formatDate(user.last_login_at) : 'Never'}</td>
+                                        <td>
+                                            <div class="actions">
+                                                <button class="btn btn-secondary" onclick="toggleAdmin('${user.id}', '${escapeHtml(user.email)}', ${user.is_admin})">
+                                                    ${user.is_admin ? 'Remove Admin' : 'Make Admin'}
+                                                </button>
+                                                <button class="btn btn-danger" onclick="deleteUser('${user.id}', '${escapeHtml(user.email)}')">
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('usersContent').innerHTML = `
+                    <div class="users-table-container">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">⚠️</div>
+                            <h3>Failed to Load Users</h3>
+                            <p>${error.message}</p>
+                            <button class="btn btn-primary" onclick="loadUsers()">
+                                Retry
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        async function toggleAdmin(userId, userEmail, currentlyAdmin) {
+            const action = currentlyAdmin ? 'remove admin privileges from' : 'grant admin privileges to';
+            if (!confirm(`Are you sure you want to ${action} "${userEmail}"?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/users/${userId}/toggle-admin`, {
+                    method: 'PATCH'
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to update user');
+                }
+                
+                loadUsers();
+            } catch (error) {
+                alert(`Failed to update user: ${error.message}`);
+            }
+        }
+        
+        async function deleteUser(userId, userEmail) {
+            if (!confirm(`Are you sure you want to delete user "${userEmail}"? This action cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/users/${userId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to delete user');
+                }
+                
+                loadUsers();
+            } catch (error) {
+                alert(`Failed to delete user: ${error.message}`);
+            }
+        }
+        
+        // Modal functions
+        function openAddUserModal() {
+            document.getElementById('addUserModal').classList.add('show');
+            document.getElementById('addUserForm').reset();
+        }
+        
+        function closeAddUserModal() {
+            document.getElementById('addUserModal').classList.remove('show');
+        }
+        
+        // Close modal when clicking outside
+        document.getElementById('addUserModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAddUserModal();
+            }
+        });
+        
+        async function submitAddUser(event) {
+            event.preventDefault();
+            
+            const formData = {
+                email: document.getElementById('userEmail').value,
+                password: document.getElementById('userPassword').value,
+                is_admin: document.getElementById('isAdmin').checked
+            };
+            
+            try {
+                const submitBtn = event.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Adding...';
+                
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to add user');
+                }
+                
+                closeAddUserModal();
+                loadUsers();
+                alert('User added successfully!');
+            } catch (error) {
+                console.error('Error adding user:', error);
+                alert(`Failed to add user: ${error.message}`);
+            } finally {
+                const submitBtn = event.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add User';
+            }
+        }
+        
+        // Load users on page load
+        loadUsers();
+    </script>
+</body>
+</html>

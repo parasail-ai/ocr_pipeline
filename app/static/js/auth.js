@@ -34,7 +34,7 @@ async function updateNavbar() {
     const existingAuthLinks = navMenu.querySelectorAll('[data-auth-link]');
     existingAuthLinks.forEach(link => link.remove());
     
-    // Hide/show Models and Analytics links based on admin status
+    // Hide/show admin-only links based on admin status
     const modelsLink = navMenu.querySelector('a[href="/models"]');
     if (modelsLink) {
         modelsLink.style.display = authStatus.is_admin ? '' : 'none';
@@ -43,6 +43,11 @@ async function updateNavbar() {
     const analyticsLink = navMenu.querySelector('a[href="/analytics"]');
     if (analyticsLink) {
         analyticsLink.style.display = authStatus.is_admin ? '' : 'none';
+    }
+    
+    const usersLink = navMenu.querySelector('a[href="/users"]');
+    if (usersLink) {
+        usersLink.style.display = authStatus.is_admin ? '' : 'none';
     }
     
     // Add Login or Logout link

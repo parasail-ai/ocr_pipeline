@@ -733,7 +733,19 @@
 
         function renderFolders(folders) {
             const folderTree = document.getElementById('folderTree');
-            const customFolders = folders.map(folder => {
+            
+            // Filter folders: only show trash to admins
+            const visibleFolders = folders.filter(folder => {
+                const isTrash = folder.is_trash || false;
+                // If it's trash, only show to admins
+                if (isTrash) {
+                    return isAdmin;
+                }
+                // Show all non-trash folders to everyone
+                return true;
+            });
+            
+            const customFolders = visibleFolders.map(folder => {
                 const isTrash = folder.is_trash || false;
                 const trashClass = isTrash ? 'trash' : '';
                 return `
@@ -916,6 +928,7 @@
                             <h3 class="document-name" title="${escapeHtml(doc.original_filename || doc.filename)}">${escapeHtml(doc.original_filename || doc.filename)}</h3>
                             <div class="document-meta">
                                 <div>Uploaded: ${date}</div>
+                                ${doc.details && doc.details.uploaded_by ? `<div>By: ${escapeHtml(doc.details.uploaded_by)}</div>` : ''}
                                 ${doc.file_size ? `<div>Size: ${formatFileSize(doc.file_size)}</div>` : ''}
                                 ${doc.detected_type ? `<div>Type: ${escapeHtml(doc.detected_type)}</div>` : ''}
                                 ${doc.selected_model ? `<div>Model: ${escapeHtml(doc.selected_model)}</div>` : ''}

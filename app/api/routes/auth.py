@@ -1,9 +1,11 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Cookie, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from pydantic import BaseModel, EmailStr
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.session import get_db
 from app.services.auth import AuthService
 
 logger = logging.getLogger(__name__)
@@ -30,19 +32,20 @@ class SessionResponse(BaseModel):
 @router.post("/login", response_model=LoginResponse)
 async def login(
     credentials: LoginRequest,
-    response: Response
+    response: Response,
+    db: AsyncSession = Depends(get_db)
 ) -> LoginResponse:
-    """Admin login endpoint."""
+    """Login endpoint."""
     
     # Verify credentials
-    if not AuthService.verify_credentials(credentials.email, credentials.password):
+    if not await AuthService.verify_credentials(db, credentials.email, credentials.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
     
     # Create session
-    session_token = AuthService.create_session(credentials.email)
+    session_token = await AuthService.create_session(db, credentials.email)
     
     # Set session cookie (httponly for security)
     response.set_cookie(
@@ -53,12 +56,15 @@ async def login(
         samesite="lax"
     )
     
-    logger.info(f"Admin login successful: {credentials.email}")
+    logger.info(f"Login successful: {credentials.email}")
+    
+    # Check if user is admin
+    is_admin = AuthService.is_admin(session_token)
     
     return LoginResponse(
         success=True,
         message="Login successful",
-        is_admin=True
+        is_admin=is_admin
     )
 
 

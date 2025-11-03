@@ -10,21 +10,17 @@ class Base(DeclarativeBase):
     pass
 
 
-# User model temporarily disabled - will be added back with migration
-# class User(Base):
-#     """User accounts for authentication and document ownership"""
-#     __tablename__ = "users"
-#     
-#     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-#     username: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-#     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-#     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
-#     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-#     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-#     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-#     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-#     
-#     documents: Mapped[list["Document"]] = relationship(back_populates="user")
+class User(Base):
+    """User accounts for admin and regular users."""
+    __tablename__ = "users"
+    
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class Folder(Base):

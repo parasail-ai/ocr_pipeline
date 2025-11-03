@@ -170,6 +170,26 @@ async def analytics_page(
     )
 
 
+@app.get("/users", response_class=HTMLResponse)
+async def users_page(
+    request: Request,
+    session_token: Optional[str] = Cookie(None)
+) -> HTMLResponse:
+    """User management page (admin only)"""
+    # Check if user is admin
+    if not AuthService.is_admin(session_token):
+        return RedirectResponse(url="/login?return=/users", status_code=status.HTTP_303_SEE_OTHER)
+    
+    return templates.TemplateResponse(
+        "users.html",
+        {
+            "request": request,
+            "app_name": settings.app_name,
+            "is_admin": True,
+        },
+    )
+
+
 @app.get("/reference", include_in_schema=False, response_class=HTMLResponse)
 async def scalar_reference() -> HTMLResponse:
     html = SCALAR_TEMPLATE.format(title=settings.app_name, spec_url=app.openapi_url)
