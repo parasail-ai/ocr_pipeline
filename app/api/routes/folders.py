@@ -200,9 +200,24 @@ async def list_folders(
         if folder.is_home and folder.user_id != current_user_id and not is_admin:
             continue
         
-        doc_count_result = await session.execute(
-            select(func.count(Document.id)).where(Document.folder_id == folder.id)
-        )
+        # Count documents with same user filtering as document list
+        if is_admin:
+            # Admin sees all documents in folder
+            doc_count_query = select(func.count(Document.id)).where(Document.folder_id == folder.id)
+        elif current_user_id:
+            # Logged-in user: count their docs + guest docs in this folder
+            doc_count_query = select(func.count(Document.id)).where(
+                Document.folder_id == folder.id,
+                (Document.user_id == current_user_id) | (Document.user_id.is_(None))
+            )
+        else:
+            # Guest: count only guest docs in this folder
+            doc_count_query = select(func.count(Document.id)).where(
+                Document.folder_id == folder.id,
+                Document.user_id.is_(None)
+            )
+        
+        doc_count_result = await session.execute(doc_count_query)
         doc_count = doc_count_result.scalar() or 0
         
         folder_responses.append(FolderResponse(
