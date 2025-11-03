@@ -830,7 +830,7 @@
         function renderDocuments() {
             const container = document.getElementById('documentsContainer');
             container.className = currentView === 'grid' ? 'documents-grid' : 'documents-list';
-            
+
             console.log('Total documents loaded:', allDocuments.length);
             let filteredDocs = filterDocumentsByFolder(allDocuments);
             console.log('After folder filter:', filteredDocs.length);
@@ -849,6 +849,19 @@
             }
             
             container.innerHTML = filteredDocs.map(doc => createDocumentCard(doc)).join('');
+        }
+
+        function getDocumentDisplayName(doc) {
+            if (doc.details && doc.details.custom_name) {
+                return doc.details.custom_name;
+            }
+            if (doc.original_filename) {
+                return doc.original_filename;
+            }
+            if (doc.filename) {
+                return doc.filename;
+            }
+            return 'Untitled Document';
         }
 
         function filterDocumentsByFolder(documents) {
@@ -916,9 +929,11 @@
             
             // Search filter
             if (searchTerm) {
-                filtered = filtered.filter(doc => 
-                    doc.filename.toLowerCase().includes(searchTerm)
-                );
+                filtered = filtered.filter(doc => {
+                    const name = getDocumentDisplayName(doc).toLowerCase();
+                    const original = (doc.original_filename || '').toLowerCase();
+                    return name.includes(searchTerm) || original.includes(searchTerm);
+                });
             }
             
             // Status filter
@@ -933,7 +948,7 @@
                 } else if (sortBy === 'oldest') {
                     return new Date(a.created_at) - new Date(b.created_at);
                 } else if (sortBy === 'name') {
-                    return a.filename.localeCompare(b.filename);
+                    return getDocumentDisplayName(a).localeCompare(getDocumentDisplayName(b));
                 }
                 return 0;
             });
@@ -949,9 +964,10 @@
             const status = getDocumentStatus(doc);
             const statusClass = status;
             const statusText = status.charAt(0).toUpperCase() + status.slice(1);
-            const icon = getDocumentIcon(doc.original_filename || doc.filename);
+            const icon = getDocumentIcon(doc.original_filename || doc.filename || '');
             const date = new Date(doc.uploaded_at || doc.created_at).toLocaleDateString();
-            
+            const displayName = getDocumentDisplayName(doc);
+
             // Determine if document is from guest
             const isGuestDoc = !doc.user_id;
             const ownerBadge = isGuestDoc ? 
@@ -984,9 +1000,9 @@
                     <div class="document-card-header">
                         <div class="document-icon">${icon}</div>
                         <div class="document-info">
-                            <h3 class="document-name" title="${escapeHtml(doc.original_filename || doc.filename)}">${escapeHtml(doc.original_filename || doc.filename)}</h3>
+                            <h3 class="document-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}${ownerBadge}</h3>
                             <div class="document-meta">
-                                <div>Uploaded: ${date} ${isGuestDoc ? '(Guest)' : doc.user_id ? '(User)' : ''}</div>
+                                <div>Uploaded: ${date}</div>
                                 ${doc.file_size ? `<div>Size: ${formatFileSize(doc.file_size)}</div>` : ''}
                                 ${doc.detected_type ? `<div>Type: ${escapeHtml(doc.detected_type)}</div>` : ''}
                                 ${doc.selected_model ? `<div>Model: ${escapeHtml(doc.selected_model)}</div>` : ''}

@@ -38,6 +38,7 @@ async def upload_document(
     model_name: str | None = Form(None),
     schema_id: str | None = Form(None),
     preprocessing: str = Form("automatic"),
+    display_name: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentRead:
     try:
@@ -108,6 +109,13 @@ async def upload_document(
                     pass
         
         # Create document record
+        details = {
+            "content_type": file.content_type,
+            "preprocessing": preprocessing,
+        }
+        if display_name:
+            details["custom_name"] = display_name.strip()
+
         document = Document(
             original_filename=file.filename,
             user_id=user_id_uuid,  # None for anonymous
@@ -117,10 +125,7 @@ async def upload_document(
             blob_path=blob_path,
             blob_url=blob_url,
             status="processing",
-            details={
-                "content_type": file.content_type,
-                "preprocessing": preprocessing
-            },
+            details=details,
         )
         db.add(document)
         await db.flush()

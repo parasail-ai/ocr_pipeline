@@ -431,6 +431,11 @@
 
                 <div class="upload-options">
                     <div class="form-field">
+                        <label for="documentTitle">Document Title (Optional)</label>
+                        <input type="text" id="documentTitle" placeholder="e.g., ACME Contract Q1" maxlength="255" />
+                    </div>
+
+                    <div class="form-field">
                         <label for="schemaSelect">Schema (Optional)</label>
                         <select id="schemaSelect">
                             <option value="">Auto-detect schema</option>
@@ -511,7 +516,8 @@
             uploadStatus: document.getElementById('uploadStatus'),
             schemaSelect: document.getElementById('schemaSelect'),
             modelSelect: document.getElementById('modelSelect'),
-            preprocessingSelect: document.getElementById('preprocessingSelect')
+            preprocessingSelect: document.getElementById('preprocessingSelect'),
+            documentTitle: document.getElementById('documentTitle')
         };
 
         let selectedFiles = [];
@@ -718,6 +724,7 @@
             elements.schemaSelect.value = '';
             elements.modelSelect.value = '';
             elements.preprocessingSelect.value = 'automatic';
+            elements.documentTitle.value = '';
         });
 
         // Form submit handler
@@ -750,13 +757,18 @@
 
                     const formData = new FormData();
                     formData.append('file', file);
-                    
+
                     if (elements.schemaSelect.value) {
                         formData.append('schema_id', elements.schemaSelect.value);
                     }
-                    
+
                     formData.append('model_name', elements.modelSelect.value);
                     formData.append('preprocessing', elements.preprocessingSelect.value || 'automatic');
+
+                    const customTitle = elements.documentTitle.value.trim();
+                    if (customTitle && selectedFiles.length === 1) {
+                        formData.append('display_name', customTitle);
+                    }
 
                     try {
                         const response = await fetch('/api/documents', {

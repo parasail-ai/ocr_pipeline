@@ -570,7 +570,8 @@
         console.log("Updating UI with document:", docData);
 
         // Update document name
-        document.getElementById("document-name").textContent = docData.original_filename;
+        const displayName = (docData.details && docData.details.custom_name) || docData.original_filename || docData.filename || 'Untitled Document';
+        document.getElementById("document-name").textContent = displayName;
         
         // Update tab spinners
         updateTabSpinners();
@@ -977,9 +978,12 @@
         }
 
         // Build comprehensive JSON output
+        const displayName = (docData.details && docData.details.custom_name) || docData.original_filename || docData.filename || 'Untitled Document';
+
         const output = {
           document_id: docData.id,
           filename: docData.original_filename,
+          display_name: displayName,
           status: docData.status,
           uploaded_at: docData.uploaded_at,
           processed_at: docData.last_processed_at,
