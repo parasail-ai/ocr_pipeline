@@ -175,8 +175,10 @@ async def upload_document(
         return DocumentRead(
             id=document.id,
             original_filename=document.original_filename,
+            user_id=document.user_id,
             selected_model=document.selected_model,
             selected_schema_id=document.selected_schema_id,
+            folder_id=document.folder_id,
             blob_path=document.blob_path,
             blob_url=document.blob_url,
             uploaded_at=document.uploaded_at,
@@ -397,6 +399,7 @@ async def list_documents(request: Request, db: AsyncSession = Depends(get_db)) -
             detected_type=doc.detected_type,
             detected_confidence=doc.detected_confidence,
             selected_schema=doc.selected_schema,
+            folder_id=doc.folder_id,
             # Empty collections - will be loaded on-demand for individual document view
             ocr_results=[],
             schemas=[],

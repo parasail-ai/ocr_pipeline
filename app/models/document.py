@@ -21,11 +21,11 @@ class DocumentRead(BaseModel):
     detected_type: Optional[str]
     detected_confidence: Optional[float]
     selected_schema: Optional["SchemaRead"] = None
-    ocr_results: list["DocumentOcrResultRead"] = []
-    schemas: list["DocumentSchemaAssignmentRead"] = []
-    contents: list["DocumentContentRead"] = []
-    classifications: list["DocumentClassificationRead"] = []
-    extractions: list["DocumentExtractionRead"] = []
+    ocr_results: list["DocumentOcrResultRead"] = Field(default_factory=list)
+    schemas: list["DocumentSchemaAssignmentRead"] = Field(default_factory=list)
+    contents: list["DocumentContentRead"] = Field(default_factory=list)
+    classifications: list["DocumentClassificationRead"] = Field(default_factory=list)
+    extractions: list["DocumentExtractionRead"] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
