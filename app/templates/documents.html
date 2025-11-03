@@ -830,8 +830,11 @@
             const container = document.getElementById('documentsContainer');
             container.className = currentView === 'grid' ? 'documents-grid' : 'documents-list';
             
+            console.log('Total documents loaded:', allDocuments.length);
             let filteredDocs = filterDocumentsByFolder(allDocuments);
+            console.log('After folder filter:', filteredDocs.length);
             filteredDocs = applyFilters(filteredDocs);
+            console.log('After search/status filter:', filteredDocs.length);
             
             if (filteredDocs.length === 0) {
                 container.innerHTML = `
