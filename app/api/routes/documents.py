@@ -375,6 +375,11 @@ async def list_documents(request: Request, db: AsyncSession = Depends(get_db)) -
     
     documents = filtered_documents
     
+    logger.info(
+        f"Returning {len(documents)} documents for user_id={current_user_id}, "
+        f"is_admin={is_admin}, trash_folder_id={trash_folder_id}"
+    )
+    
     # Return documents with empty collections for heavy relationships
     return DocumentList(items=[
         DocumentRead(
