@@ -51,8 +51,8 @@ async function updateNavbar() {
     }
     
     // Add Login or Logout link
-    if (authStatus.is_authenticated && authStatus.is_admin) {
-        // Add Logout link
+    if (authStatus.is_authenticated) {
+        // Add Logout link for any authenticated user (admin or not)
         const logoutLink = document.createElement('a');
         logoutLink.href = '#';
         logoutLink.className = 'nav-link';
@@ -64,7 +64,7 @@ async function updateNavbar() {
         };
         navMenu.appendChild(logoutLink);
     } else {
-        // Add Login link
+        // Add Login link for unauthenticated users
         const loginLink = document.createElement('a');
         loginLink.href = '/login';
         loginLink.className = 'nav-link';
