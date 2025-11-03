@@ -132,10 +132,12 @@ class AuthService:
         # Check if user is in database
         user = await cls.get_user_by_email(db, email)
         is_admin = user.is_admin if user else (email == cls.ADMIN_EMAIL)
+        user_id = str(user.id) if user else None
         
         cls._sessions[session_token] = {
             "email": email,
-            "is_admin": is_admin
+            "is_admin": is_admin,
+            "user_id": user_id
         }
         return session_token
     

@@ -85,13 +85,21 @@ async def upload_document(
                 logger.error(f"Schema not found: {schema_uuid}")
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schema not found")
 
-        # Get current user from session
+        # Get current user from session (None for anonymous uploads)
         session_token = request.cookies.get("session_token")
-        current_user = AuthService.get_user_from_session(session_token)
+        user_id_uuid = None
+        if session_token:
+            user_data = AuthService.get_user_from_session(session_token)
+            if user_data and user_data.get("user_id"):
+                try:
+                    user_id_uuid = uuid.UUID(user_data.get("user_id"))
+                except (ValueError, TypeError):
+                    pass
         
         # Create document record
         document = Document(
             original_filename=file.filename,
+            user_id=user_id_uuid,  # None for anonymous
             selected_model=model_name,
             selected_schema_id=schema_uuid,
             blob_path=blob_path,
@@ -99,8 +107,7 @@ async def upload_document(
             status="processing",
             details={
                 "content_type": file.content_type,
-                "preprocessing": preprocessing,
-                "uploaded_by": current_user.get("username") if current_user else "anonymous"  # Track uploader
+                "preprocessing": preprocessing
             },
         )
         db.add(document)
@@ -306,18 +313,21 @@ async def get_document_extractions_json(
 async def list_documents(request: Request, db: AsyncSession = Depends(get_db)) -> DocumentList:
     # Get current user from session
     session_token = request.cookies.get("session_token")
-    current_user = AuthService.get_user_from_session(session_token)
     is_admin = AuthService.is_admin(session_token)
+    current_user_id = None
     
-    # Build query - only load minimal data for list view (selected_schema for display)
+    if session_token:
+        user_data = AuthService.get_user_from_session(session_token)
+        if user_data and user_data.get("user_id"):
+            try:
+                current_user_id = uuid.UUID(user_data.get("user_id"))
+            except (ValueError, TypeError):
+                pass
+    
+    # Build query
     query = select(Document).options(
-        selectinload(Document.selected_schema),  # Only schema for display
-        # Skip loading heavy relationships for list view:
-        # - ocr_results, schemas, contents, classifications, extractions
-        # These will be loaded on-demand when viewing individual documents
-    )
-    
-    query = query.order_by(Document.uploaded_at.desc())
+        selectinload(Document.selected_schema),
+    ).order_by(Document.uploaded_at.desc())
     
     result = await db.execute(query)
     documents = list(result.scalars().all())
@@ -328,12 +338,26 @@ async def list_documents(request: Request, db: AsyncSession = Depends(get_db)) -
     )
     trash_folder_id = trash_folder_result.scalar_one_or_none()
     
-    # Filter out trash documents for non-admin users
-    if not is_admin and trash_folder_id:
-        documents = [
-            doc for doc in documents 
-            if doc.folder_id != trash_folder_id
-        ]
+    # Filter documents based on user permissions
+    filtered_documents = []
+    for doc in documents:
+        # Always exclude trash for non-admins
+        if not is_admin and trash_folder_id and doc.folder_id == trash_folder_id:
+            continue
+        
+        # Admin sees everything
+        if is_admin:
+            filtered_documents.append(doc)
+        # Logged-in user sees their own documents only
+        elif current_user_id:
+            if doc.user_id == current_user_id:
+                filtered_documents.append(doc)
+        # Anonymous users see only anonymous documents
+        else:
+            if doc.user_id is None:
+                filtered_documents.append(doc)
+    
+    documents = filtered_documents
     
     # Return documents with empty collections for heavy relationships
     return DocumentList(items=[
