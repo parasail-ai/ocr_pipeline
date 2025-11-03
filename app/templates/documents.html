@@ -587,12 +587,19 @@
             <div class="documents-main">
                 <div class="documents-header">
                     <h2 id="folderTitle">All Documents</h2>
-                    <div class="view-toggle">
-                        <button class="view-btn active" onclick="setView('grid')" data-view="grid">
-                            <span>⊞ Grid</span>
-                        </button>
-                        <button class="view-btn" onclick="setView('list')" data-view="list">
-                            <span>☰ List</span>
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <div id="guestFilterContainer" style="display: none;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 14px; cursor: pointer;">
+                                <input type="checkbox" id="showGuestDocs" checked style="cursor: pointer;">
+                                <span>Show Guest Documents</span>
+                            </label>
+                        </div>
+                        <div class="view-toggle">
+                            <button class="view-btn active" onclick="setView('grid')" data-view="grid">
+                                <span>⊞ Grid</span>
+                            </button>
+                            <button class="view-btn" onclick="setView('list')" data-view="list">
+                                <span>☰ List</span>
                         </button>
                     </div>
                 </div>
@@ -645,12 +652,20 @@
         let isTrashFolder = false;
         let trashFolderId = null;
         let isAdmin = false;
+        let isLoggedIn = false;
+        let showGuestDocs = true;
 
         // Load documents on page load
         document.addEventListener('DOMContentLoaded', async () => {
             await checkAdminStatus();
             await loadFolders();
             loadDocuments();
+            
+            // Add guest filter toggle handler
+            document.getElementById('showGuestDocs').addEventListener('change', (e) => {
+                showGuestDocs = e.target.checked;
+                renderDocuments();
+            });
         });
         
         async function checkAdminStatus() {
@@ -659,6 +674,12 @@
                 if (response.ok) {
                     const data = await response.json();
                     isAdmin = data.is_admin || false;
+                    isLoggedIn = data.is_authenticated || false;
+                    
+                    // Show guest filter for logged-in non-admin users
+                    if (isLoggedIn && !isAdmin) {
+                        document.getElementById('guestFilterContainer').style.display = 'block';
+                    }
                 }
             } catch (error) {
                 console.error('Failed to check admin status:', error);
