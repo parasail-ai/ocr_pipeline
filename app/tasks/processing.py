@@ -188,52 +188,104 @@ async def process_document_task(
             
             client = ParasailOCRClient()
             
-            # Check if this is a multi-page PDF
+            # Check if this is a multi-page document (PDF or PPTX)
             converter = DocumentConverterService()
-            if converter.is_pdf(file_bytes):
-                page_count = await asyncio.to_thread(converter.get_page_count, file_bytes)
-                logger.info(f"Detected PDF with {page_count} pages")
+            filename = Path(blob_path).name
+            
+            # Check if it's a multi-page document that should be converted to images
+            if converter.is_pdf(file_bytes) or converter.is_pptx(file_bytes):
+                doc_type = "PDF" if converter.is_pdf(file_bytes) else "PPTX"
                 
-                if page_count > 1:
-                    # Split PDF into individual page images
-                    logger.info(f"Splitting PDF into {page_count} page images...")
-                    page_images = await asyncio.to_thread(
-                        converter.convert_to_images,
-                        file_bytes,
-                        "document.pdf",
-                        dpi=200  # Good quality for OCR
-                    )
-                    logger.info(f"Split {len(page_images)} pages successfully")
+                if converter.is_pdf(file_bytes):
+                    page_count = await asyncio.to_thread(converter.get_page_count, file_bytes)
+                    logger.info(f"Detected PDF with {page_count} pages")
                     
-                    # Process all pages
-                    parasail_response = await asyncio.to_thread(
-                        client.extract_multi_page,
-                        page_images=page_images,
-                        filename=Path(blob_path).name,
-                        model=model_name,
-                    )
-                    logger.info(f"Parasail multi-page OCR completed for {page_count} pages")
-                    
-                    # Extract combined text from multi-page response
-                    parasail_text = parasail_response.get("combined_text", "")
-                else:
-                    # Single page PDF - process normally
-                    logger.info(f"Processing single-page PDF")
-                    parasail_response = await asyncio.to_thread(
-                        client.extract_document,
-                        content=file_bytes,
-                        filename=Path(blob_path).name,
-                        mime_type=content_type,
-                        model=model_name,
-                    )
-                    parasail_text = _extract_text_from_parasail_response(parasail_response)
+                    if page_count > 1:
+                        # Multi-page PDF - split into images
+                        logger.info(f"Splitting PDF into {page_count} page images...")
+                        page_images = await asyncio.to_thread(
+                            converter.convert_to_images,
+                            file_bytes,
+                            filename,
+                            dpi=200  # Good quality for OCR
+                        )
+                        logger.info(f"Split {len(page_images)} pages successfully")
+                        
+                        # Process all pages
+                        parasail_response = await asyncio.to_thread(
+                            client.extract_multi_page,
+                            page_images=page_images,
+                            filename=filename,
+                            model=model_name,
+                        )
+                        logger.info(f"Parasail multi-page OCR completed for {page_count} pages")
+                        
+                        # Extract combined text from multi-page response
+                        parasail_text = parasail_response.get("combined_text", "")
+                    else:
+                        # Single page PDF - process normally
+                        logger.info(f"Processing single-page PDF")
+                        parasail_response = await asyncio.to_thread(
+                            client.extract_document,
+                            content=file_bytes,
+                            filename=filename,
+                            mime_type=content_type,
+                            model=model_name,
+                        )
+                        parasail_text = _extract_text_from_parasail_response(parasail_response)
+                        
+                elif converter.is_pptx(file_bytes):
+                    # PPTX - convert slides to images
+                    logger.info(f"Detected PPTX file, converting slides to images...")
+                    try:
+                        page_images = await asyncio.to_thread(
+                            converter.convert_to_images,
+                            file_bytes,
+                            filename,
+                            dpi=200  # Good quality for OCR
+                        )
+                        logger.info(f"Converted PPTX to {len(page_images)} slide images")
+                        
+                        if len(page_images) > 1:
+                            # Process all slides
+                            parasail_response = await asyncio.to_thread(
+                                client.extract_multi_page,
+                                page_images=page_images,
+                                filename=filename,
+                                model=model_name,
+                            )
+                            logger.info(f"Parasail multi-page OCR completed for {len(page_images)} slides")
+                            
+                            # Extract combined text from multi-page response
+                            parasail_text = parasail_response.get("combined_text", "")
+                        else:
+                            # Single slide - process normally
+                            parasail_response = await asyncio.to_thread(
+                                client.extract_document,
+                                content=page_images[0] if page_images else file_bytes,
+                                filename=filename,
+                                mime_type="image/png",
+                                model=model_name,
+                            )
+                            parasail_text = _extract_text_from_parasail_response(parasail_response)
+                    except Exception as exc:
+                        logger.warning(f"PPTX conversion failed: {str(exc)}, processing as single file")
+                        # Fallback to processing original file
+                        parasail_response = await asyncio.to_thread(
+                            client.extract_document,
+                            content=file_bytes,
+                            filename=filename,
+                            mime_type=content_type,
+                            model=model_name,
+                        )
+                        parasail_text = _extract_text_from_parasail_response(parasail_response)
             else:
-                # Not a PDF - process as single image/document
-                logger.info(f"Processing non-PDF document ({content_type})")
+                # Not a multi-page document - process as single image/document
+                logger.info(f"Processing non-multi-page document ({content_type})")
                 parasail_response = await asyncio.to_thread(
                     client.extract_document,
                     content=file_bytes,
-                    filename=Path(blob_path).name,
+                    filename=filename,
                     mime_type=content_type,
                     model=model_name,
                 )
