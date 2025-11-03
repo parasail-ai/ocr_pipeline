@@ -676,9 +676,9 @@ async def delete_document(
     
     # Get or create trash folder
     result = await db.execute(
-        select(Folder).where(Folder.is_trash == True)
+        select(Folder).where(Folder.is_trash == True).limit(1)
     )
-    trash_folder = result.scalar_one_or_none()
+    trash_folder = result.scalars().first()
     
     if not trash_folder:
         trash_folder = Folder(
