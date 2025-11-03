@@ -69,9 +69,34 @@ class FolderListResponse(BaseModel):
 @router.post("", response_model=FolderResponse, status_code=201)
 async def create_folder(
     folder_data: FolderCreate,
+    request: Request,
     session: AsyncSession = Depends(get_db)
 ) -> Any:
-    """Create a new folder"""
+    """Create a new folder (requires authentication)"""
+    
+    # Get current user from session - require authentication
+    session_token = request.cookies.get("session_token")
+    if not session_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required to create folders"
+        )
+    
+    user_data = AuthService.get_user_from_session(session_token)
+    if not user_data or not user_data.get("user_id"):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid session"
+        )
+    
+    try:
+        from uuid import UUID
+        user_id = UUID(user_data.get("user_id"))
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid user ID"
+        )
     
     # Build the path
     path = folder_data.name
@@ -83,13 +108,23 @@ async def create_folder(
         parent = result.scalar_one_or_none()
         if not parent:
             raise HTTPException(status_code=404, detail="Parent folder not found")
+        
+        # Verify user owns parent folder or is admin
+        is_admin = AuthService.is_admin(session_token)
+        if not is_admin and parent.user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Cannot create subfolder in another user's folder"
+            )
+        
         path = f"{parent.path}/{folder_data.name}"
     
-    # Create folder
+    # Create folder with user ownership
     folder = Folder(
         name=folder_data.name,
         parent_id=folder_data.parent_id,
-        path=path
+        path=path,
+        user_id=user_id
     )
     
     session.add(folder)
@@ -200,6 +235,12 @@ async def list_folders(
         # Skip other users' home folders
         if folder.is_home and folder.user_id != current_user_id and not is_admin:
             continue
+        
+        # Skip other users' regular folders (non-system folders)
+        if not is_admin and folder.user_id is not None and folder.user_id != current_user_id:
+            # This is another user's folder, skip it
+            if not (hasattr(folder, 'is_system') and folder.is_system):
+                continue
         
         # Count documents with same user filtering as document list
         if is_admin:
