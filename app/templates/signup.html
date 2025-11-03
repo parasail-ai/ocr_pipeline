@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - OCR Pipeline</title>
+    <title>Sign Up - OCR Pipeline</title>
     <link rel="stylesheet" href="/static/css/main.css">
     <style>
-        .login-container {
+        .signup-container {
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -14,33 +14,33 @@
             padding: 2rem;
         }
         
-        .login-card {
+        .signup-card {
             background: white;
             border-radius: 16px;
             padding: 3rem;
-            max-width: 400px;
+            max-width: 450px;
             width: 100%;
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
         
-        .login-header {
+        .signup-header {
             text-align: center;
             margin-bottom: 2rem;
         }
         
-        .login-header h1 {
+        .signup-header h1 {
             margin: 0 0 0.5rem 0;
             font-size: 2rem;
             color: #333;
         }
         
-        .login-header p {
+        .signup-header p {
             margin: 0;
             color: #666;
             font-size: 14px;
         }
         
-        .login-form {
+        .signup-form {
             display: grid;
             gap: 1.5rem;
         }
@@ -70,7 +70,7 @@
             box-shadow: 0 0 0 3px rgba(103, 58, 183, 0.1);
         }
         
-        .login-button {
+        .signup-button {
             background: var(--primary-color);
             color: white;
             border: none;
@@ -82,11 +82,11 @@
             transition: background 0.2s;
         }
         
-        .login-button:hover {
+        .signup-button:hover {
             background: var(--primary-dark);
         }
         
-        .login-button:disabled {
+        .signup-button:disabled {
             background: #ccc;
             cursor: not-allowed;
         }
@@ -104,40 +104,55 @@
             display: block;
         }
         
-        .back-link {
-            text-align: center;
-            margin-top: 1.5rem;
+        .success-message {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 0.875rem;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
         }
         
-        .back-link a {
-            color: var(--primary-color);
-            text-decoration: none;
+        .success-message.show {
+            display: block;
+        }
+        
+        .login-link {
+            text-align: center;
+            margin-top: 1.5rem;
             font-size: 14px;
         }
         
-        .back-link a:hover {
+        .login-link a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .login-link a:hover {
             text-decoration: underline;
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="login-card">
-            <div class="login-header">
-                <h1>🔐 Admin Login</h1>
-                <p>Sign in to access admin features</p>
+    <div class="signup-container">
+        <div class="signup-card">
+            <div class="signup-header">
+                <h1>📝 Create Account</h1>
+                <p>Sign up to start using OCR Pipeline</p>
             </div>
             
             <div id="error-message" class="error-message"></div>
+            <div id="success-message" class="success-message"></div>
             
-            <form class="login-form" id="login-form">
+            <form class="signup-form" id="signup-form">
                 <div class="form-group">
                     <label for="email">Email</label>
                     <input 
                         type="email" 
                         id="email" 
                         name="email" 
-                        placeholder="admin@example.com"
+                        placeholder="your@email.com"
                         required
                         autocomplete="email"
                     >
@@ -151,47 +166,68 @@
                         name="password" 
                         placeholder="••••••••"
                         required
-                        autocomplete="current-password"
+                        autocomplete="new-password"
+                        minlength="8"
+                    >
+                    <small style="color: #666; font-size: 12px;">Minimum 8 characters</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm-password">Confirm Password</label>
+                    <input 
+                        type="password" 
+                        id="confirm-password" 
+                        name="confirm-password" 
+                        placeholder="••••••••"
+                        required
+                        autocomplete="new-password"
+                        minlength="8"
                     >
                 </div>
                 
-                <button type="submit" class="login-button" id="login-button">
-                    Sign In
+                <button type="submit" class="signup-button" id="signup-button">
+                    Create Account
                 </button>
             </form>
             
-            <div class="back-link">
-                <a href="/">← Back to Home</a>
-            </div>
-            
-            <div style="text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e0e0e0;">
-                <p style="color: #666; font-size: 14px; margin: 0 0 0.5rem 0;">Don't have an account?</p>
-                <a href="/signup" style="color: var(--primary-color); text-decoration: none; font-weight: 600; font-size: 14px;">Create Account</a>
+            <div class="login-link">
+                Already have an account? <a href="/login">Sign in</a>
             </div>
         </div>
     </div>
     
     <script>
-        const form = document.getElementById('login-form');
+        const form = document.getElementById('signup-form');
         const errorMessage = document.getElementById('error-message');
-        const loginButton = document.getElementById('login-button');
+        const successMessage = document.getElementById('success-message');
+        const signupButton = document.getElementById('signup-button');
         
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
             
-            // Clear previous errors
+            // Clear previous messages
             errorMessage.classList.remove('show');
+            successMessage.classList.remove('show');
             errorMessage.textContent = '';
+            successMessage.textContent = '';
             
-            // Disable button during login
-            loginButton.disabled = true;
-            loginButton.textContent = 'Signing in...';
+            // Validate passwords match
+            if (password !== confirmPassword) {
+                errorMessage.textContent = 'Passwords do not match';
+                errorMessage.classList.add('show');
+                return;
+            }
+            
+            // Disable button during signup
+            signupButton.disabled = true;
+            signupButton.textContent = 'Creating account...';
             
             try {
-                const response = await fetch('/api/auth/login', {
+                const response = await fetch('/api/users/signup', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -200,22 +236,26 @@
                 });
                 
                 if (response.ok) {
-                    const data = await response.json();
-                    // Redirect to home or previous page
-                    const returnUrl = new URLSearchParams(window.location.search).get('return') || '/';
-                    window.location.href = returnUrl;
+                    successMessage.textContent = 'Account created successfully! Redirecting to login...';
+                    successMessage.classList.add('show');
+                    
+                    // Redirect to login after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
                 } else {
-                    const error = await response.json().catch(() => ({ detail: 'Login failed' }));
-                    errorMessage.textContent = error.detail || 'Invalid email or password';
+                    const error = await response.json().catch(() => ({ detail: 'Signup failed' }));
+                    errorMessage.textContent = error.detail || 'Failed to create account';
                     errorMessage.classList.add('show');
+                    signupButton.disabled = false;
+                    signupButton.textContent = 'Create Account';
                 }
             } catch (error) {
-                console.error('Login error:', error);
+                console.error('Signup error:', error);
                 errorMessage.textContent = 'An error occurred. Please try again.';
                 errorMessage.classList.add('show');
-            } finally {
-                loginButton.disabled = false;
-                loginButton.textContent = 'Sign In';
+                signupButton.disabled = false;
+                signupButton.textContent = 'Create Account';
             }
         });
     </script>

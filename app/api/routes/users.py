@@ -56,6 +56,22 @@ async def require_admin(
         )
 
 
+@router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def signup(
+    request: CreateUserRequest,
+    db: AsyncSession = Depends(get_db)
+) -> UserResponse:
+    """Public signup endpoint for new users."""
+    user = await AuthService.create_user(
+        db=db,
+        email=request.email,
+        password=request.password,
+        is_admin=False  # New signups are never admin
+    )
+    
+    return UserResponse.from_user(user)
+
+
 @router.get("", response_model=UsersListResponse)
 async def list_users(
     db: AsyncSession = Depends(get_db),

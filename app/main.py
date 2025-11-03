@@ -120,9 +120,21 @@ async def schemas_page(
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request) -> HTMLResponse:
-    """Admin login page"""
+    """Login page"""
     return templates.TemplateResponse(
         "login.html",
+        {
+            "request": request,
+            "app_name": settings.app_name,
+        },
+    )
+
+
+@app.get("/signup", response_class=HTMLResponse)
+async def signup_page(request: Request) -> HTMLResponse:
+    """Signup page for new users"""
+    return templates.TemplateResponse(
+        "signup.html",
         {
             "request": request,
             "app_name": settings.app_name,
