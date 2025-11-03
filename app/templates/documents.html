@@ -554,7 +554,14 @@
                 <a href="/documents" class="nav-link active">Documents</a>
                 <a href="/schemas" class="nav-link">Schemas</a>
                 <a href="/models" class="nav-link">Models</a>
-                <a href="/docs" class="nav-link" target="_blank">API Docs</a>
+                <div class="nav-dropdown">
+                    <button class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">
+                        More ▾
+                    </button>
+                    <div class="nav-dropdown-menu">
+                        <a href="/docs" class="nav-dropdown-item" target="_blank">API Docs</a>
+                    </div>
+                </div>
                 <a href="/users" class="nav-link">Users</a>
                 <a href="/analytics" class="nav-link">Analytics</a>
             </div>

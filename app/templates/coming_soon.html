@@ -73,7 +73,14 @@
                 <a href="/documents" class="nav-link">Documents</a>
                 <a href="/schemas" class="nav-link {% if page_name == 'schemas' %}active{% endif %}">Schemas</a>
                 <a href="/models" class="nav-link {% if page_name == 'models' %}active{% endif %}">Models</a>
-                <a href="/docs" class="nav-link" target="_blank">API Docs</a>
+                <div class="nav-dropdown">
+                    <button class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">
+                        More ▾
+                    </button>
+                    <div class="nav-dropdown-menu">
+                        <a href="/docs" class="nav-dropdown-item" target="_blank">API Docs</a>
+                    </div>
+                </div>
                 <a href="/analytics" class="nav-link {% if page_name == 'analytics' %}active{% endif %}">Analytics</a>
             </div>
         </div>
