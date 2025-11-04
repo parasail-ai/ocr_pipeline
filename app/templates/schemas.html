@@ -317,13 +317,23 @@
     </div>
 
     <script>
+        // Schema field management - declare at top level
+        let fieldCounter = 0;
+        let isAdmin = false;
+        
         // Load current configuration
         async function loadConfiguration() {
+            // Only load configuration if the form exists (admin only)
+            const apiEndpoint = document.getElementById('api-endpoint');
+            if (!apiEndpoint) {
+                return; // Not an admin, skip loading configuration
+            }
+            
             try {
                 const response = await fetch('/api/config/ai-schema-generator');
                 if (response.ok) {
                     const config = await response.json();
-                    document.getElementById('api-endpoint').value = config.api_endpoint || 'https://api.parasail.io/v1';
+                    apiEndpoint.value = config.api_endpoint || 'https://api.parasail.io/v1';
                     document.getElementById('model-name').value = config.model_name || 'parasail-glm-46';
                     
                     if (config.has_api_key) {
@@ -331,50 +341,53 @@
                     }
                 } else {
                     // Set defaults if no config exists
-                    document.getElementById('api-endpoint').value = 'https://api.parasail.io/v1';
+                    apiEndpoint.value = 'https://api.parasail.io/v1';
                     document.getElementById('model-name').value = 'parasail-glm-46';
                 }
             } catch (error) {
                 console.error('Error loading configuration:', error);
-                showAlert('Failed to load configuration', 'error');
+                // Don't show alert for non-admins
             }
         }
 
         // Save configuration
-        document.getElementById('config-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const formData = new FormData(e.target);
-            const config = {
-                api_endpoint: formData.get('api_endpoint'),
-                model_name: formData.get('model_name'),
-                api_key: formData.get('api_key')
-            };
-            
-            try {
-                const response = await fetch('/api/config/ai-schema-generator', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(config)
-                });
+        const configForm = document.getElementById('config-form');
+        if (configForm) {
+            configForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
                 
-                if (response.ok) {
-                    showAlert('✅ Configuration saved successfully!', 'success');
-                    // Clear the API key input
-                    document.getElementById('api-key').value = '';
-                    // Reload to show masked key
-                    loadConfiguration();
-                } else {
-                    const error = await response.json();
-                    showAlert(`❌ Failed to save: ${error.detail || 'Unknown error'}`, 'error');
+                const formData = new FormData(e.target);
+                const config = {
+                    api_endpoint: formData.get('api_endpoint'),
+                    model_name: formData.get('model_name'),
+                    api_key: formData.get('api_key')
+                };
+                
+                try {
+                    const response = await fetch('/api/config/ai-schema-generator', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(config)
+                    });
+                    
+                    if (response.ok) {
+                        showAlert('✅ Configuration saved successfully!', 'success');
+                        // Clear the API key input
+                        document.getElementById('api-key').value = '';
+                        // Reload to show masked key
+                        loadConfiguration();
+                    } else {
+                        const error = await response.json();
+                        showAlert(`❌ Failed to save: ${error.detail || 'Unknown error'}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error saving configuration:', error);
+                    showAlert('❌ Failed to save configuration', 'error');
                 }
-            } catch (error) {
-                console.error('Error saving configuration:', error);
-                showAlert('❌ Failed to save configuration', 'error');
-            }
-        });
+            });
+        }
 
         // Test configuration
         async function testConfiguration() {
@@ -450,8 +463,6 @@
                 </div>
             `).join('');
         }
-        
-        let isAdmin = false;
         
         // Check admin status
         async function checkAdmin() {
@@ -531,13 +542,9 @@
             return div.innerHTML;
         }
 
-        // Schema field management
-        let fieldCounter = 0;
-
+        // Schema field management functions
         function addField() {
-            console.log('addField() called, fieldCounter:', fieldCounter);
             const container = document.getElementById('fields-container');
-            console.log('fields-container element:', container);
             if (!container) {
                 console.error('fields-container element not found!');
                 return;
