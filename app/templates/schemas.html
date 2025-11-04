@@ -422,23 +422,68 @@
             
             container.innerHTML = schemas.map(schema => `
                 <div class="schema-item">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; gap: 1rem;">
                         <div style="flex: 1;">
-                            <h3>${escapeHtml(schema.name)}</h3>
-                            <p>${escapeHtml(schema.description || 'No description')}</p>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <h3 style="margin: 0;">${escapeHtml(schema.name)}</h3>
+                                ${schema.is_public ? '<span style="background: #4caf50; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">PUBLIC</span>' : ''}
+                            </div>
+                            <p style="margin: 0.5rem 0;">${escapeHtml(schema.description || 'No description')}</p>
                             <div style="margin-top: 0.5rem; font-size: 12px; color: #999;">
                                 <span>Category: ${escapeHtml(schema.category || 'N/A')}</span> • 
                                 <span>${schema.fields?.length || 0} fields</span> •
                                 <span>Created: ${new Date(schema.created_at).toLocaleDateString()}</span>
                             </div>
                         </div>
-                        <button onclick="deleteSchema('${schema.id}', '${escapeHtml(schema.name)}')" 
-                                style="background: #f44336; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap;">
-                            🗑️ Delete
-                        </button>
+                        <div style="display: flex; gap: 0.5rem; flex-direction: column;">
+                            <button onclick="togglePublic('${schema.id}', '${escapeHtml(schema.name)}')" 
+                                    id="toggle-${schema.id}"
+                                    style="background: ${schema.is_public ? '#ff9800' : '#4caf50'}; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap; display: ${isAdmin ? 'block' : 'none'};">
+                                ${schema.is_public ? '🔓 Make Private' : '🔒 Make Public'}
+                            </button>
+                            <button onclick="deleteSchema('${schema.id}', '${escapeHtml(schema.name)}')" 
+                                    style="background: #f44336; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap;">
+                                🗑️ Delete
+                            </button>
+                        </div>
                     </div>
                 </div>
             `).join('');
+        }
+        
+        let isAdmin = false;
+        
+        // Check admin status
+        async function checkAdmin() {
+            try {
+                const response = await fetch('/api/auth/session');
+                if (response.ok) {
+                    const data = await response.json();
+                    isAdmin = data.is_admin || false;
+                }
+            } catch (error) {
+                console.error('Error checking admin status:', error);
+            }
+        }
+        
+        async function togglePublic(schemaId, schemaName) {
+            try {
+                const response = await fetch(`/api/schemas/${schemaId}/toggle-public`, {
+                    method: 'PATCH'
+                });
+                
+                if (response.ok) {
+                    const updated = await response.json();
+                    showAlert(`Schema "${schemaName}" is now ${updated.is_public ? 'PUBLIC' : 'PRIVATE'}`, 'success');
+                    loadSchemas(); // Reload to show updated state
+                } else {
+                    const error = await response.json().catch(() => ({}));
+                    showAlert(error.detail || 'Failed to toggle visibility', 'error');
+                }
+            } catch (error) {
+                console.error('Error toggling visibility:', error);
+                showAlert('Failed to toggle visibility', 'error');
+            }
         }
         
         async function deleteSchema(schemaId, schemaName) {
@@ -608,7 +653,8 @@
         });
 
         // Load on page load
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAdmin();
             loadConfiguration();
             loadSchemas();
             // Add one initial field

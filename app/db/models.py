@@ -106,6 +106,9 @@ class SchemaDefinition(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     category: Mapped[str | None] = mapped_column(String(120), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     fields: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -118,6 +121,7 @@ class SchemaDefinition(Base):
         UUID(as_uuid=True), ForeignKey("schema_definitions.id", ondelete="SET NULL"), nullable=True
     )
 
+    user: Mapped["User | None"] = relationship("User", foreign_keys=[user_id])
     document_schemas: Mapped[list["DocumentSchema"]] = relationship(back_populates="schema", cascade="all, delete-orphan")
     parent_schema: Mapped["SchemaDefinition | None"] = relationship("SchemaDefinition", remote_side=[id], foreign_keys=[parent_schema_id])
 

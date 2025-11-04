@@ -35,16 +35,31 @@ class AISchemaGenerateResponse(BaseModel):
 
 
 @router.post("", response_model=SchemaRead, status_code=status.HTTP_201_CREATED)
-async def create_schema(payload: SchemaCreate, db: AsyncSession = Depends(get_db)) -> SchemaRead:
+async def create_schema(
+    payload: SchemaCreate, 
+    session_token: Optional[str] = Cookie(None),
+    db: AsyncSession = Depends(get_db)
+) -> SchemaRead:
+    from app.services.auth import AuthService
+    
     exists = await db.scalar(select(SchemaDefinition).where(SchemaDefinition.name == payload.name))
     if exists:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Schema with that name already exists")
 
+    # Get user_id from session
+    user_id = None
+    if session_token:
+        user_data = AuthService.get_user_from_session(session_token)
+        if user_data:
+            user_id = user_data.get("user_id")
+    
     schema = SchemaDefinition(
         name=payload.name,
         category=payload.category,
         description=payload.description,
         fields=[field.model_dump() for field in payload.fields],
+        user_id=user_id,
+        is_public=False  # Default to private
     )
     db.add(schema)
     await db.commit()
@@ -67,11 +82,15 @@ async def list_schemas(
     if current_user is None:
         # Guest users: only public schemas
         stmt = stmt.where(SchemaDefinition.is_public == True)
-    elif not current_user.is_admin:
-        # Regular logged-in users: public schemas only (for now)
-        # TODO: Add user_id field to schemas to support user-owned schemas
-        stmt = stmt.where(SchemaDefinition.is_public == True)
-    # Admin users: see all schemas (no additional filter)
+    elif current_user.is_admin:
+        # Admin: see all schemas
+        pass
+    else:
+        # Logged-in users: their own schemas + public schemas
+        stmt = stmt.where(
+            (SchemaDefinition.user_id == current_user.id) | 
+            (SchemaDefinition.is_public == True)
+        )
     
     if category:
         stmt = stmt.where(SchemaDefinition.category == category)
@@ -114,6 +133,34 @@ async def update_schema(
     
     await db.commit()
     await db.refresh(schema)
+    return SchemaRead.model_validate(schema)
+
+
+@router.patch("/{schema_id}/toggle-public", response_model=SchemaRead)
+async def toggle_schema_public(
+    schema_id: uuid.UUID,
+    session_token: Optional[str] = Cookie(None),
+    db: AsyncSession = Depends(get_db)
+) -> SchemaRead:
+    """Toggle schema public visibility (admin only)."""
+    from app.services.auth import AuthService
+    
+    # Check admin permission
+    if not AuthService.is_admin(session_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can change schema visibility"
+        )
+    
+    schema = await db.get(SchemaDefinition, schema_id)
+    if not schema:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schema not found")
+    
+    # Toggle is_public
+    schema.is_public = not schema.is_public
+    await db.commit()
+    await db.refresh(schema)
+    
     return SchemaRead.model_validate(schema)
 
 

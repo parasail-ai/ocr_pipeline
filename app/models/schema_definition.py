@@ -24,9 +24,11 @@ class SchemaCreate(BaseModel):
 class SchemaRead(BaseModel):
     id: uuid.UUID
     name: str
+    user_id: uuid.UUID | None = None
     category: str | None = None
     description: str | None = None
     fields: list[SchemaField]
+    is_public: bool = False
     created_at: datetime
     updated_at: datetime
     version: int

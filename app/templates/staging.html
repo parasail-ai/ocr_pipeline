@@ -1180,6 +1180,23 @@
         }));
         
         try {
+          // Get session token from cookies
+          const sessionToken = getCookie('session_token');
+          
+          // Get user_id from session
+          let userId = null;
+          if (sessionToken) {
+            try {
+              const sessionResponse = await fetch('/api/auth/session');
+              if (sessionResponse.ok) {
+                const sessionData = await sessionResponse.json();
+                userId = sessionData.user_id;
+              }
+            } catch (e) {
+              console.log('Could not get user session, continuing as guest');
+            }
+          }
+          
           const response = await fetch('/api/schemas', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1187,7 +1204,8 @@
               name: schemaName,
               category: category || null,
               description: description || `Auto-generated from ${docData.original_filename}`,
-              fields: fields
+              fields: fields,
+              user_id: userId
             })
           });
           
