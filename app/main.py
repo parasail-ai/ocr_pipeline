@@ -202,26 +202,6 @@ async def users_page(
     )
 
 
-@app.get("/test-ocr", response_class=HTMLResponse)
-async def test_ocr_page(
-    request: Request,
-    session_token: Optional[str] = Cookie(None)
-) -> HTMLResponse:
-    """Test OCR page (admin only)"""
-    # Check if user is admin
-    if not AuthService.is_admin(session_token):
-        return RedirectResponse(url="/login?return=/test-ocr", status_code=status.HTTP_303_SEE_OTHER)
-    
-    return templates.TemplateResponse(
-        "test_ocr.html",
-        {
-            "request": request,
-            "app_name": settings.app_name,
-            "is_admin": True,
-        },
-    )
-
-
 @app.get("/reference", include_in_schema=False, response_class=HTMLResponse)
 async def scalar_reference(
     session_token: Optional[str] = Cookie(None)

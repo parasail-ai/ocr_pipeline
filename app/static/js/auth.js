@@ -54,12 +54,6 @@ async function updateNavbar() {
         analyticsLink.style.display = authStatus.is_admin ? '' : 'none';
     }
 
-    // Test OCR - admin only
-    const testOcrLink = navMenu.querySelector('a[href="/test-ocr"]');
-    if (testOcrLink) {
-        testOcrLink.style.display = authStatus.is_admin ? '' : 'none';
-    }
-
     // Users - admin only
     const usersLink = navMenu.querySelector('a[href="/users"]');
     if (usersLink) {
