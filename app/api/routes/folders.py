@@ -426,10 +426,10 @@ async def delete_folder(
         raise HTTPException(status_code=404, detail="Folder not found")
     
     # Move documents to uncategorized (set folder_id to None)
-    await session.execute(
+    docs_result = await session.execute(
         select(Document).where(Document.folder_id == folder_id)
     )
-    documents = result.scalars().all()
+    documents = docs_result.scalars().all()
     for doc in documents:
         doc.folder_id = None
     
