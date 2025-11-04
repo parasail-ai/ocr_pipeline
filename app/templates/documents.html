@@ -799,12 +799,22 @@
             
             const customFolders = visibleFolders.map(folder => {
                 const isTrash = folder.is_trash || false;
+                const isSystem = folder.is_system || false;
                 const trashClass = isTrash ? 'trash' : '';
+                const showDelete = !isSystem && !isTrash; // Can't delete system or trash folders
+                
                 return `
                     <li class="folder-item ${trashClass}" data-folder-id="${folder.id}" data-is-trash="${isTrash}">
                         <span class="folder-icon">${isTrash ? '🗑️' : '📁'}</span>
                         <span class="folder-name">${escapeHtml(folder.name)}</span>
                         <span class="folder-count">${folder.document_count || 0}</span>
+                        ${showDelete ? `
+                            <button onclick="event.stopPropagation(); deleteFolder('${folder.id}', '${escapeHtml(folder.name)}')" 
+                                    style="background: transparent; border: none; color: #999; cursor: pointer; padding: 4px; font-size: 14px; margin-left: auto;"
+                                    title="Delete folder">
+                                🗑️
+                            </button>
+                        ` : ''}
                     </li>
                 `;
             }).join('');
@@ -1337,6 +1347,37 @@
             } catch (error) {
                 console.error('Error moving document:', error);
                 alert('Failed to move document to folder: ' + error.message);
+            }
+        }
+
+        async function deleteFolder(folderId, folderName) {
+            if (!confirm(`Delete folder "${folderName}" and move its documents to uncategorized?`)) {
+                return;
+            }
+            
+            try {
+                console.log('Deleting folder:', folderId);
+                const response = await fetch(`/api/folders/${folderId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Delete folder failed:', errorText);
+                    throw new Error(`Failed to delete folder: ${response.status}`);
+                }
+                
+                console.log('Folder deleted successfully');
+                
+                // Reload folders and documents
+                await loadFolders();
+                await loadDocuments();
+                
+                // Switch to All Documents view
+                selectFolder('all');
+            } catch (error) {
+                console.error('Error deleting folder:', error);
+                alert('Failed to delete folder: ' + error.message);
             }
         }
 
