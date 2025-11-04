@@ -449,6 +449,10 @@
                             </div>
                         </div>
                         <div style="display: flex; gap: 0.5rem; flex-direction: column;">
+                            <button onclick="editSchema('${schema.id}')" 
+                                    style="background: #2196f3; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap;">
+                                ✏️ Edit
+                            </button>
                             <button onclick="togglePublic('${schema.id}', '${escapeHtml(schema.name)}')" 
                                     id="toggle-${schema.id}"
                                     style="background: ${schema.is_public ? '#ff9800' : '#4caf50'}; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap; display: ${isAdmin ? 'block' : 'none'};">
@@ -474,6 +478,46 @@
                 }
             } catch (error) {
                 console.error('Error checking admin status:', error);
+            }
+        }
+        
+        async function editSchema(schemaId) {
+            try {
+                // Fetch the schema details
+                const response = await fetch(`/api/schemas/${schemaId}`);
+                if (!response.ok) throw new Error('Failed to load schema');
+                
+                const schema = await response.json();
+                
+                // Populate form with schema data
+                document.getElementById('schema-name').value = schema.name;
+                document.getElementById('schema-category').value = schema.category || '';
+                document.getElementById('schema-description').value = schema.description || '';
+                
+                // Clear existing fields
+                document.getElementById('fields-container').innerHTML = '';
+                fieldCounter = 0;
+                
+                // Add fields from schema
+                schema.fields.forEach(field => {
+                    addField();
+                    const lastField = document.querySelector(`#field-${fieldCounter - 1}`);
+                    if (lastField) {
+                        lastField.querySelector('.field-key').value = field.key || field.name || '';
+                        lastField.querySelector('.field-query').value = field.query || field.description || '';
+                    }
+                });
+                
+                // Store schema ID for update
+                document.getElementById('schema-form').dataset.editingId = schemaId;
+                document.querySelector('#schema-form button[type="submit"]').textContent = '💾 Update Schema';
+                
+                // Scroll to form
+                document.getElementById('schema-form').scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                console.error('Error loading schema for edit:', error);
+                alert('Failed to load schema for editing');
             }
         }
         
@@ -643,8 +687,14 @@
             };
             
             try {
-                const response = await fetch('/api/schemas', {
-                    method: 'POST',
+                const editingId = e.target.dataset.editingId;
+                const isEditing = !!editingId;
+                
+                const url = isEditing ? `/api/schemas/${editingId}` : '/api/schemas';
+                const method = isEditing ? 'PATCH' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
                     headers: {
                         'Content-Type': 'application/json'
                     },
@@ -652,16 +702,18 @@
                 });
                 
                 if (response.ok) {
-                    showAlert(`✅ Schema "${schemaName}" created successfully!`, 'success');
+                    showAlert(`✅ Schema "${schemaName}" ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
                     resetSchemaForm();
+                    delete e.target.dataset.editingId;
+                    document.querySelector('#schema-form button[type="submit"]').textContent = '💾 Save Schema';
                     loadSchemas(); // Reload the schemas list
                 } else {
                     const error = await response.json();
-                    showAlert(`❌ Failed to create schema: ${error.detail || 'Unknown error'}`, 'error');
+                    showAlert(`❌ Failed to ${isEditing ? 'update' : 'create'} schema: ${error.detail || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
-                console.error('Error creating schema:', error);
-                showAlert('❌ Failed to create schema', 'error');
+                console.error('Error saving schema:', error);
+                showAlert('❌ Failed to save schema', 'error');
             }
         });
 
