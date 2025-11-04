@@ -1133,14 +1133,26 @@
         }
 
         async function deleteDocument(documentId) {
-            if (!confirm('Move this document to trash?')) return;
+            console.log('deleteDocument called for:', documentId);
+            if (!confirm('Move this document to trash?')) {
+                console.log('Delete cancelled by user');
+                return;
+            }
             
             try {
+                console.log('Calling DELETE /api/documents/' + documentId);
                 const response = await fetch(`/api/documents/${documentId}`, {
                     method: 'DELETE'
                 });
                 
-                if (!response.ok) throw new Error('Failed to delete document');
+                console.log('Delete response status:', response.status);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Delete failed:', errorText);
+                    throw new Error('Failed to delete document');
+                }
+                
+                console.log('Document deleted successfully, reloading...');
                 
                 // Small delay to ensure backend update completes
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -1150,9 +1162,11 @@
                 
                 // Then reload documents to reflect trash move
                 await loadDocuments();
+                
+                console.log('Reload complete');
             } catch (error) {
                 console.error('Error deleting document:', error);
-                alert('Failed to move document to trash');
+                alert('Failed to move document to trash: ' + error.message);
             }
         }
         
