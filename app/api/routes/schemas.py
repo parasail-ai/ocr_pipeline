@@ -69,26 +69,40 @@ async def create_schema(
 
 @router.get("", response_model=SchemaList)
 async def list_schemas(
-    category: str | None = None, 
-    db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    category: str | None = None,
+    session_token: Optional[str] = Cookie(None),
+    db: AsyncSession = Depends(get_db)
 ) -> SchemaList:
+    from app.services.auth import AuthService
+    
     stmt = select(SchemaDefinition).order_by(SchemaDefinition.created_at.desc())
     
     # Filter out internal ad-hoc schema placeholder
     stmt = stmt.where(SchemaDefinition.name != "__ad_hoc_auto_generated__")
     
+    # Get user info from session
+    is_admin = AuthService.is_admin(session_token)
+    user_id = None
+    
+    if session_token:
+        user_data = AuthService.get_user_from_session(session_token)
+        if user_data and user_data.get("user_id"):
+            try:
+                user_id = uuid.UUID(user_data.get("user_id"))
+            except (ValueError, TypeError):
+                pass
+    
     # Apply access control based on user status
-    if current_user is None:
+    if not session_token:
         # Guest users: only public schemas
         stmt = stmt.where(SchemaDefinition.is_public == True)
-    elif current_user.is_admin:
+    elif is_admin:
         # Admin: see all schemas
         pass
     else:
         # Logged-in users: their own schemas + public schemas
         stmt = stmt.where(
-            (SchemaDefinition.user_id == current_user.id) | 
+            (SchemaDefinition.user_id == user_id) | 
             (SchemaDefinition.is_public == True)
         )
     
