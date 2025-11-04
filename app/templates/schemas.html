@@ -535,7 +535,13 @@
         let fieldCounter = 0;
 
         function addField() {
+            console.log('addField() called, fieldCounter:', fieldCounter);
             const container = document.getElementById('fields-container');
+            console.log('fields-container element:', container);
+            if (!container) {
+                console.error('fields-container element not found!');
+                return;
+            }
             const fieldId = `field-${fieldCounter++}`;
             
             const fieldHtml = `
