@@ -30,6 +30,7 @@ from app.services.document_converter import DocumentConverterService
 from app.services.schema_generator import SchemaGenerator
 from app.services.table_extractor import TableExtractor
 from app.services.text_extractor import TextExtractionService
+from app.services.unpaper_processor import UnpaperProcessor, UnpaperUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,53 @@ async def process_document_task(
         logger.exception("Failed to download document %s from blob storage", document_id, exc_info=exc)
         await _update_document_status(document_id, status="error", details={"error": str(exc), "stage": "download_failed"})
         return
+
+    # Apply unpaper preprocessing if requested
+    if preprocessing == "unpaper":
+        try:
+            logger.info(f"Applying unpaper preprocessing for document {document_id}")
+            await _update_document_status(
+                document_id,
+                status="preprocessing",
+                details={"stage": "unpaper_preprocessing", "preprocessing": preprocessing}
+            )
+            
+            # Check if file type is supported by unpaper (images only)
+            filename = Path(blob_path).name
+            unpaper = UnpaperProcessor()
+            
+            if unpaper.is_supported_file(filename):
+                # Save file bytes to temp file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as tmp_input:
+                    tmp_input.write(file_bytes)
+                    input_path = Path(tmp_input.name)
+                
+                try:
+                    # Process image with unpaper
+                    output_path = await asyncio.to_thread(unpaper.process_image, input_path)
+                    
+                    # Read cleaned image back
+                    with open(output_path, 'rb') as f:
+                        file_bytes = f.read()
+                    
+                    logger.info(f"Unpaper preprocessing complete - cleaned image size: {len(file_bytes)} bytes")
+                    
+                    # Cleanup temp files
+                    input_path.unlink(missing_ok=True)
+                    output_path.unlink(missing_ok=True)
+                    
+                except Exception as unpaper_exc:
+                    logger.warning(f"Unpaper preprocessing failed: {str(unpaper_exc)}, using original image")
+                    # Cleanup temp file
+                    input_path.unlink(missing_ok=True)
+            else:
+                logger.warning(f"File type not supported by unpaper: {filename}, skipping preprocessing")
+                
+        except UnpaperUnavailable as exc:
+            logger.warning(f"Unpaper not available: {str(exc)}, using original file")
+        except Exception as exc:
+            logger.exception(f"Unpaper preprocessing error for document {document_id}", exc_info=exc)
+            # Continue with original file on error
 
     docling_extraction: dict[str, Any] | None = None
     docling_text: str | None = None

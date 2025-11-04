@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload - OCR Pipeline</title>
+    <title>Test OCR - Admin</title>
     <link rel="stylesheet" href="/static/css/main.css">
     <style>
         .signup-banner {
@@ -445,27 +445,21 @@
                 </a>
             </div>
             <div class="nav-menu">
-                <a href="/" class="nav-link active">Upload</a>
+                <a href="/" class="nav-link">Upload</a>
                 <a href="/documents" class="nav-link">Documents</a>
                 <a href="/schemas" class="nav-link">Schemas</a>
                 <a href="/models" class="nav-link">Models</a>
                 <a href="/users" class="nav-link">Users</a>
                 <a href="/analytics" class="nav-link">Analytics</a>
-                <a href="/test-ocr" class="nav-link">Test OCR</a>
+                <a href="/test-ocr" class="nav-link active">Test OCR</a>
             </div>
         </div>
     </nav>
 
     <div class="container">
-        <div class="signup-banner" id="signupBanner">
-            <h2>🔒 Keep Your Information Private</h2>
-            <p>Create a free account to securely store and organize your documents</p>
-            <a href="/signup" class="signup-banner-btn">Sign Up Now</a>
-        </div>
-
         <div class="upload-hero">
-            <h1>📄 Upload Document</h1>
-            <p>Process documents with AI-powered OCR and extract structured data</p>
+            <h1>🧪 Test OCR Pipeline</h1>
+            <p>Admin testing area for new preprocessing frameworks and models</p>
         </div>
 
         <div class="upload-section">
@@ -510,6 +504,8 @@
                         <label for="preprocessingSelect">Pre-Processing</label>
                         <select id="preprocessingSelect">
                             <option value="automatic">Automatic</option>
+                            <option value="docstrange">DocStrange (Advanced Cleaning)</option>
+                            <option value="unpaper">Unpaper (Image Cleaning & Deskew)</option>
                         </select>
                     </div>
                 </div>
@@ -897,27 +893,6 @@
         // Initialize
         loadSchemas();
         loadModels();
-        
-        // Hide signup banner for logged-in users
-        async function checkAuthAndHideBanner() {
-            try {
-                const response = await fetch('/api/auth/session');
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data && data.is_authenticated) {
-                        // User is logged in, hide the signup banner
-                        const signupBanner = document.getElementById('signupBanner');
-                        if (signupBanner) {
-                            signupBanner.style.display = 'none';
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Error checking authentication:', error);
-            }
-        }
-        
-        checkAuthAndHideBanner();
     </script>
 </body>
 </html>
