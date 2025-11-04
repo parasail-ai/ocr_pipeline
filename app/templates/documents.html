@@ -1310,25 +1310,33 @@
             
             try {
                 // Move document to folder
+                console.log(`Moving document ${documentId} to folder ${folderId}`);
                 const response = await fetch(`/api/folders/${folderId}/documents/${documentId}`, {
                     method: 'POST'
                 });
                 
+                console.log('Move response status:', response.status, response.ok);
+                
                 if (!response.ok) {
-                    throw new Error('Failed to move document to folder');
+                    const errorText = await response.text();
+                    console.error('Move failed:', errorText);
+                    throw new Error(`Failed to move document: ${response.status}`);
                 }
                 
+                console.log('Move successful');
+                
                 // Show success feedback
-                const folderName = e.currentTarget.querySelector('.folder-name').textContent;
+                const folderName = e.currentTarget.querySelector('.folder-name')?.textContent || 'folder';
                 showSuccessToast(`Document moved to ${folderName}`);
                 
                 // Reload folders and documents to update counts
                 await loadFolders();
                 await loadDocuments();
                 
+                console.log('Reload complete after move');
             } catch (error) {
                 console.error('Error moving document:', error);
-                alert('Failed to move document to folder');
+                alert('Failed to move document to folder: ' + error.message);
             }
         }
 
