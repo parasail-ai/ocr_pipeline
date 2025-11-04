@@ -444,27 +444,37 @@ async def move_document_to_folder(
     document_id: UUID,
     session: AsyncSession = Depends(get_db)
 ) -> None:
-    """Move a document to a folder"""
+    """Move a document to a folder (anyone can move documents)"""
+    import logging
+    logger = logging.getLogger(__name__)
     
-    # Verify folder exists
-    folder_result = await session.execute(
-        select(Folder).where(Folder.id == folder_id)
-    )
-    folder = folder_result.scalar_one_or_none()
-    if not folder:
-        raise HTTPException(status_code=404, detail="Folder not found")
-    
-    # Get document
-    doc_result = await session.execute(
-        select(Document).where(Document.id == document_id)
-    )
-    document = doc_result.scalar_one_or_none()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-    
-    # Move document
-    document.folder_id = folder_id
-    await session.commit()
+    try:
+        # Verify folder exists
+        folder_result = await session.execute(
+            select(Folder).where(Folder.id == folder_id)
+        )
+        folder = folder_result.scalar_one_or_none()
+        if not folder:
+            logger.error(f"Folder not found: {folder_id}")
+            raise HTTPException(status_code=404, detail="Folder not found")
+        
+        # Get document
+        doc_result = await session.execute(
+            select(Document).where(Document.id == document_id)
+        )
+        document = doc_result.scalar_one_or_none()
+        if not document:
+            logger.error(f"Document not found: {document_id}")
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        # Move document
+        logger.info(f"Moving document {document_id} to folder {folder_id} ({folder.name})")
+        document.folder_id = folder_id
+        await session.commit()
+        logger.info(f"Document moved successfully")
+    except Exception as e:
+        logger.exception(f"Error moving document: {e}")
+        raise
 
 
 @router.delete("/documents/{document_id}/folder", status_code=204)
