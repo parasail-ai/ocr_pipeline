@@ -551,10 +551,6 @@
     <nav class="navbar">
         <div class="container">
             <div class="nav-brand">
-                <a href="https://parasail.io" target="_blank" style="color: var(--primary-color); text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-                    Parasail
-                </a>
-                <span style="color: #ccc; margin: 0 8px;">|</span>
                 <a href="/" style="color: var(--primary-color); text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 12px;">
                     <span class="logo-icon">📄</span>
                     OCR Pipeline
@@ -582,7 +578,7 @@
                 <ul class="folder-tree" id="folderTree">
                     <li class="folder-item active" data-folder-id="all">
                         <span class="folder-icon">📁</span>
-                        <span class="folder-name">All Documents</span>
+                        <span class="folder-name">Public Examples</span>
                         <span class="folder-count" id="allCount">0</span>
                     </li>
                     <li class="folder-item" data-folder-id="uncategorized">
@@ -597,7 +593,7 @@
             <!-- Documents Main Area -->
             <div class="documents-main">
                 <div class="documents-header">
-                    <h2 id="folderTitle">All Documents</h2>
+                    <h2 id="folderTitle">Public Examples</h2>
                     <div style="display: flex; gap: 1rem; align-items: center;">
                         <div id="guestFilterContainer" style="display: none;">
                             <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 14px; cursor: pointer;">
@@ -827,11 +823,11 @@
                 `;
             }
             
-            // Add All Documents
+            // Add Public Examples (for guests, this shows public docs)
             folderTreeHTML += `
                 <li class="folder-item active" data-folder-id="all">
                     <span class="folder-icon">📁</span>
-                    <span class="folder-name">All Documents</span>
+                    <span class="folder-name">Public Examples</span>
                     <span class="folder-count" id="allCount">0</span>
                 </li>
             `;
@@ -884,7 +880,7 @@
             // Update header
             const folderItem = document.querySelector(`[data-folder-id="${folderId}"]`);
             document.getElementById('folderTitle').textContent = 
-                folderItem ? folderItem.querySelector('.folder-name').textContent : 'All Documents';
+                folderItem ? folderItem.querySelector('.folder-name').textContent : 'Public Examples';
             
             renderDocuments();
         }

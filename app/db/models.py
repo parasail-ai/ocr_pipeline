@@ -113,6 +113,7 @@ class SchemaDefinition(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     version: Mapped[int] = mapped_column(nullable=False, default=1)
     is_template: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     parent_schema_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("schema_definitions.id", ondelete="SET NULL"), nullable=True
     )

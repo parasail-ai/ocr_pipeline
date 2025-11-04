@@ -1,13 +1,15 @@
 import asyncio
 import logging
 import uuid
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import SchemaDefinition
+from app.api.dependencies.auth import get_current_user_optional
+from app.db.models import SchemaDefinition, User
 from app.db.session import get_db
 from app.models.schema_definition import SchemaCreate, SchemaList, SchemaRead
 from app.services.ai_schema_generator import create_ai_schema_generator
@@ -51,11 +53,25 @@ async def create_schema(payload: SchemaCreate, db: AsyncSession = Depends(get_db
 
 
 @router.get("", response_model=SchemaList)
-async def list_schemas(category: str | None = None, db: AsyncSession = Depends(get_db)) -> SchemaList:
+async def list_schemas(
+    category: str | None = None, 
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> SchemaList:
     stmt = select(SchemaDefinition).order_by(SchemaDefinition.created_at.desc())
     
     # Filter out internal ad-hoc schema placeholder
     stmt = stmt.where(SchemaDefinition.name != "__ad_hoc_auto_generated__")
+    
+    # Apply access control based on user status
+    if current_user is None:
+        # Guest users: only public schemas
+        stmt = stmt.where(SchemaDefinition.is_public == True)
+    elif not current_user.is_admin:
+        # Regular logged-in users: public schemas only (for now)
+        # TODO: Add user_id field to schemas to support user-owned schemas
+        stmt = stmt.where(SchemaDefinition.is_public == True)
+    # Admin users: see all schemas (no additional filter)
     
     if category:
         stmt = stmt.where(SchemaDefinition.category == category)

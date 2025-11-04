@@ -34,22 +34,27 @@ async function updateNavbar() {
     const existingAuthLinks = navMenu.querySelectorAll('[data-auth-link]');
     existingAuthLinks.forEach(link => link.remove());
     
-    // Hide/show admin-only links based on admin status
-    const adminLinks = navMenu.querySelectorAll('.admin-only');
-    adminLinks.forEach(link => {
-        link.style.display = authStatus.is_admin ? '' : 'none';
-    });
-
+    // Hide/show links based on auth status
+    
+    // Schemas - only for logged-in users
+    const schemasLink = navMenu.querySelector('a[href="/schemas"]');
+    if (schemasLink) {
+        schemasLink.style.display = authStatus.is_authenticated ? '' : 'none';
+    }
+    
+    // Models - only for logged-in users  
     const modelsLink = navMenu.querySelector('a[href="/models"]');
     if (modelsLink) {
-        modelsLink.style.display = authStatus.is_admin ? '' : 'none';
+        modelsLink.style.display = authStatus.is_authenticated ? '' : 'none';
     }
 
+    // Analytics - admin only
     const analyticsLink = navMenu.querySelector('a[href="/analytics"]');
     if (analyticsLink) {
         analyticsLink.style.display = authStatus.is_admin ? '' : 'none';
     }
 
+    // Users - admin only
     const usersLink = navMenu.querySelector('a[href="/users"]');
     if (usersLink) {
         usersLink.style.display = authStatus.is_admin ? '' : 'none';

@@ -439,10 +439,6 @@
     <nav class="navbar">
         <div class="container">
             <div class="nav-brand">
-                <a href="https://parasail.io" target="_blank" style="color: var(--primary-color); text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-                    Parasail
-                </a>
-                <span style="color: #ccc; margin: 0 8px;">|</span>
                 <a href="/" style="color: var(--primary-color); text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 12px;">
                     <span class="logo-icon">📄</span>
                     OCR Pipeline
@@ -617,8 +613,8 @@
                 activeModels.forEach(model => {
                     const option = document.createElement('option');
                     option.value = model.name;
-                    // Show display name and provider only
-                    option.textContent = `${model.display_name} (${model.provider})`;
+                    // Show display name only
+                    option.textContent = `${model.display_name}`;
                     option.title = `Model: ${model.display_name}\nProvider: ${model.provider}\nEndpoint: ${model.endpoint_url}`;
                     elements.modelSelect.appendChild(option);
                 });
@@ -907,7 +903,7 @@
                 const response = await fetch('/api/auth/session');
                 if (response.ok) {
                     const data = await response.json();
-                    if (data && data.user_id) {
+                    if (data && data.is_authenticated) {
                         // User is logged in, hide the signup banner
                         const signupBanner = document.getElementById('signupBanner');
                         if (signupBanner) {
