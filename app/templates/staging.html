@@ -353,6 +353,15 @@
       <div class="tab-content active" id="tab-preview">
         <div class="preview-panel">
           <h2 class="card-title">Document Preview</h2>
+          
+          <!-- Show preprocessing info if applied -->
+          <div id="preprocessing-info" style="display: none; background: #e3f2fd; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #1976d2;">
+            <div style="font-weight: 600; color: #1976d2; margin-bottom: 0.5rem;">
+              🔧 Preprocessing Applied: <span id="preprocessing-name"></span>
+            </div>
+            <div style="font-size: 13px; color: #666;" id="preprocessing-details"></div>
+          </div>
+          
           <iframe id="document-preview" class="preview-frame" title="Document preview" style="width: 100%; height: 700px; border: 1px solid #e0e0e0; border-radius: 8px;"></iframe>
         </div>
       </div>
@@ -645,6 +654,23 @@
           }
         } else {
           console.warn("No document ID available");
+        }
+        
+        // Show preprocessing info if applied
+        if (docData.details && docData.details.preprocessing && docData.details.preprocessing !== 'automatic') {
+          const preprocessingInfo = document.getElementById('preprocessing-info');
+          const preprocessingName = document.getElementById('preprocessing-name');
+          const preprocessingDetails = document.getElementById('preprocessing-details');
+          
+          preprocessingInfo.style.display = 'block';
+          preprocessingName.textContent = docData.details.preprocessing.toUpperCase();
+          
+          const descriptions = {
+            'docstrange': 'Converted document to LLM-optimized markdown before OCR for better layout extraction',
+            'unpaper': 'Cleaned scanned image by removing dark edges and deskewing pages before OCR'
+          };
+          
+          preprocessingDetails.textContent = descriptions[docData.details.preprocessing] || 'Applied before OCR processing';
         }
 
         // Update OCR text display
