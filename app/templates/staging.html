@@ -1197,6 +1197,8 @@
             }
           }
           
+          console.log('Saving schema:', { name: schemaName, category, fields: fields.length });
+          
           const response = await fetch('/api/schemas', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1204,13 +1206,15 @@
               name: schemaName,
               category: category || null,
               description: description || `Auto-generated from ${docData.original_filename}`,
-              fields: fields,
-              user_id: userId
+              fields: fields
             })
           });
           
+          console.log('Save schema response status:', response.status);
+          
           if (response.ok) {
             const savedSchema = await response.json();
+            console.log('Schema saved successfully:', savedSchema);
             alert(`Schema "${schemaName}" saved successfully!`);
             closeSaveSchemaDialog();
             
@@ -1218,12 +1222,13 @@
             await loadDocument();
             updateExtractedFieldsTab();
           } else {
-            const error = await response.json().catch(() => ({}));
-            alert(error.detail || 'Failed to save schema');
+            const errorData = await response.json().catch(() => ({}));
+            console.error('Failed to save schema:', errorData);
+            alert(errorData.detail || 'Failed to save schema');
           }
         } catch (error) {
           console.error('Error saving schema:', error);
-          alert('Failed to save schema');
+          alert('Failed to save schema: ' + error.message);
         }
       }
 
