@@ -654,11 +654,17 @@
 
         // Load on page load
         document.addEventListener('DOMContentLoaded', async () => {
-            await checkAdmin();
-            loadConfiguration();
-            loadSchemas();
-            // Add one initial field
-            addField();
+            try {
+                await checkAdmin();
+                loadConfiguration();
+                loadSchemas();
+                // Add one initial field
+                console.log('Adding initial field...');
+                addField();
+                console.log('Initial field added');
+            } catch (error) {
+                console.error('Error during page initialization:', error);
+            }
         });
     </script>
 </body>
