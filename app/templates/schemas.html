@@ -244,6 +244,16 @@
         </div>
         {% endif %}
 
+        <!-- Schemas List -->
+        <div class="schemas-list">
+            <h2 style="margin: 0 0 1rem 0;">📋 Document Schemas</h2>
+            <p style="color: #666; margin-bottom: 1.5rem;">Manage your custom extraction schemas</p>
+            
+            <div id="schemas-container">
+                <p style="color: #999;">Loading schemas...</p>
+            </div>
+        </div>
+
         <!-- Create Custom Schema -->
         <div class="config-section">
             <div class="config-header">
@@ -303,16 +313,6 @@
                     <button type="button" class="btn btn-secondary" onclick="resetSchemaForm()">🔄 Reset</button>
                 </div>
             </form>
-        </div>
-
-        <!-- Schemas List -->
-        <div class="schemas-list">
-            <h2 style="margin: 0 0 1rem 0;">📋 Document Schemas</h2>
-            <p style="color: #666; margin-bottom: 1.5rem;">Manage your custom extraction schemas</p>
-            
-            <div id="schemas-container">
-                <p style="color: #999;">Loading schemas...</p>
-            </div>
         </div>
     </div>
 
