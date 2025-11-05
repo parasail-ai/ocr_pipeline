@@ -9,6 +9,7 @@ class DocumentRead(BaseModel):
     id: uuid.UUID
     original_filename: str
     user_id: Optional[uuid.UUID] = None
+    user_email: Optional[str] = None
     selected_model: Optional[str]
     selected_schema_id: Optional[uuid.UUID]
     folder_id: Optional[uuid.UUID] = None

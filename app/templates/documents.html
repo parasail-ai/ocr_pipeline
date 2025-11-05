@@ -1081,6 +1081,7 @@
                                 ${doc.file_size ? `<div>Size: ${formatFileSize(doc.file_size)}</div>` : ''}
                                 ${doc.detected_type ? `<div>Type: ${escapeHtml(doc.detected_type)}</div>` : ''}
                                 ${doc.selected_model ? `<div>Model: ${escapeHtml(doc.selected_model)}</div>` : ''}
+                                <div>User: ${doc.user_id ? (doc.user_email || 'User') : 'Guest'}</div>
                             </div>
                             ${extractedInfo}
                         </div>

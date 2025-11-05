@@ -387,12 +387,23 @@ async def list_documents(request: Request, db: AsyncSession = Depends(get_db)) -
         f"is_admin={is_admin}, trash_folder_id={trash_folder_id}"
     )
     
-    # Return documents with empty collections for heavy relationships
+    # Get user emails for documents (for display)
+    user_emails = {}
+    user_ids = {doc.user_id for doc in documents if doc.user_id}
+    if user_ids:
+        users_result = await db.execute(
+            select(User).where(User.id.in_(user_ids))
+        )
+        for user in users_result.scalars():
+            user_emails[user.id] = user.email
+    
+    # Return documents with user email included
     return DocumentList(items=[
         DocumentRead(
             id=doc.id,
             original_filename=doc.original_filename,
             user_id=doc.user_id,
+            user_email=user_emails.get(doc.user_id) if doc.user_id else None,
             selected_model=doc.selected_model,
             selected_schema_id=doc.selected_schema_id,
             blob_path=doc.blob_path,
