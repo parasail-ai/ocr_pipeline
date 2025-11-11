@@ -48,7 +48,11 @@ class BlobStorageService:
                 raise
 
     def upload_document(self, content: bytes, filename: str, content_type: Optional[str] = None) -> tuple[str, str]:
-        blob_name = f"{uuid.uuid4()}/{filename}"
+        # URL-encode the filename to handle spaces and special characters
+        from urllib.parse import quote
+        safe_filename = quote(filename, safe='')
+        
+        blob_name = f"{uuid.uuid4()}/{safe_filename}"
         blob_client = self.blob_service.get_blob_client(container=self.container_name, blob=blob_name)
         data_stream = BytesIO(content)
 
