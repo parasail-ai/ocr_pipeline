@@ -486,8 +486,10 @@ async def get_document_content(document_id: uuid.UUID, db: AsyncSession = Depend
     
     try:
         # Download the document from blob storage
+        logger.info(f"Downloading document content for {document_id}, blob_path: {document.blob_path}")
         blob_service = BlobStorageService()
         file_content = blob_service.download_document(document.blob_path)
+        logger.info(f"Downloaded {len(file_content)} bytes")
         
         # Determine content type based on filename extension
         content_type = "application/octet-stream"
@@ -629,10 +631,10 @@ async def get_document_content(document_id: uuid.UUID, db: AsyncSession = Depend
             }
         )
     except Exception as e:
-        logger.error(f"Failed to retrieve document content: {str(e)}")
+        logger.exception(f"Failed to retrieve document content for {document_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve document content"
+            detail=f"Failed to retrieve document content: {str(e)}"
         )
 
 
