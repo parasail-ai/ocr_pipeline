@@ -622,11 +622,16 @@ async def get_document_content(document_id: uuid.UUID, db: AsyncSession = Depend
         
         # Return as streaming response
         from io import BytesIO
+        from urllib.parse import quote
+        
+        # Encode filename for Content-Disposition header (handles unicode characters)
+        safe_filename = quote(document.original_filename.encode('utf-8'))
+        
         return StreamingResponse(
             BytesIO(file_content),
             media_type=content_type,
             headers={
-                "Content-Disposition": f'inline; filename="{document.original_filename}"',
+                "Content-Disposition": f"inline; filename*=UTF-8''{safe_filename}",
                 "Cache-Control": "public, max-age=3600"
             }
         )
